@@ -1,6 +1,16 @@
-# распакованные данные — в git только data/raw/*.zip и xlsx
+# --- материалы организатора: выданы под пароль, в git НЕ хранятся (репозиторий к сдаче публичный)
+# скачивание: LCT_PASSWORD=... scripts/download_data.sh
+data/raw/*
+!data/raw/.gitkeep
 data/work/
-# артефакты
+docs/materials/*
+!docs/materials/.gitkeep
+docs/TZ_full.txt
+# производные от медицинских изображений и запись сессии организатора
+docs/img/
+docs/transcripts/
+
+# --- артефакты
 __pycache__/
 *.pyc
 .venv/
