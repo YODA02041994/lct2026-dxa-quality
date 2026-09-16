@@ -20,7 +20,8 @@
 | Вопросы экспертам и ответы | [docs/03_Вопросы_экспертам.md](docs/03_Вопросы_экспертам.md) |
 | Техническая архитектура решения | [docs/04_Архитектура.md](docs/04_Архитектура.md) |
 | План работ по дням и вехам | [PLAN.md](PLAN.md) |
-| Задачи | GitHub Issues, сгруппированы по Milestones M1–M4 |
+| Задачи и доска | [Issues](https://github.com/dru4elos/lct2026-dxa-quality/issues) по вехам M1–M4 · [доска](https://github.com/users/dru4elos/projects/2) |
+| Официальные ответы организатора (формат, словарь, масштаб) | [docs/03 → «Официальные ответы»](docs/03_Вопросы_экспертам.md) |
 | Полный текст ТЗ | [docs/TZ_full.txt](docs/TZ_full.txt), PDF в `docs/materials/` |
 | Шаблон презентации (слайды 7–11 обязательны) | `docs/materials/ЛЦТ2026_Шаблон_презентации.pptx` |
 
