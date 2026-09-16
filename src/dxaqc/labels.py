@@ -80,6 +80,14 @@ class RegionLabel:
         return fp is not None and self.total is not None and int(fp) != self.total
 
     @property
+    def truth(self) -> int | None:
+        """Истинная метка изображения по правилу организатора (сессия 16.09):
+        верить колонкам критериев, НЕ колонке «Итог»; любой флаг = 1 → нарушение.
+        None — область не размечена (в исследовании её нет)."""
+        fp = self.flags_positive
+        return None if fp is None else int(fp)
+
+    @property
     def violation_type(self) -> str:
         return violation_string({k: (v == 1) for k, v in self.flags.items()})
 
@@ -95,7 +103,8 @@ class StudyLabel:
 
     @property
     def any_violation(self) -> bool:
-        return any(r.total == 1 for r in (self.spine, self.hip_r, self.hip_l))
+        """По правилу организатора: из флагов, не из «Итог»."""
+        return any(r.truth == 1 for r in (self.spine, self.hip_r, self.hip_l))
 
 
 def _int_or_none(v):
