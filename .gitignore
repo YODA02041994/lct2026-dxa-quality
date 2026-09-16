@@ -1,0 +1,14 @@
+# распакованные данные — в git только data/raw/*.zip и xlsx
+data/work/
+# артефакты
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+runs/
+weights/*.pt
+weights/*.pth
+*.egg-info/
+.DS_Store
+.idea/
+.vscode/
