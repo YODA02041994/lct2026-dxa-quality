@@ -21,7 +21,7 @@
 | Вопросы экспертам и ответы | [docs/03_Вопросы_экспертам.md](docs/03_Вопросы_экспертам.md) |
 | Техническая архитектура решения | [docs/04_Архитектура.md](docs/04_Архитектура.md) |
 | План работ по дням и вехам | [PLAN.md](PLAN.md) |
-| Задачи и доска | [Issues](https://github.com/dru4elos/lct2026-dxa-quality/issues) по вехам M1–M4 · [доска](https://github.com/users/dru4elos/projects/2) |
+| Задачи и доска | [Issues](https://github.com/YODA02041994/lct2026-dxa-quality/issues) по вехам M1–M4 · [доска](https://github.com/users/dru4elos/projects/2) |
 | Официальные ответы организатора (формат, словарь, масштаб) | [docs/03 → «Официальные ответы»](docs/03_Вопросы_экспертам.md) |
 | Полный текст ТЗ, шаблон презентации (слайды 7–11 обязательны) | после `scripts/download_data.sh`: `docs/TZ_full.txt`, `docs/materials/` (не в git) |
 | Транскрипт сессии с экспертами 16.09 | `docs/transcripts/` (не в git — спросить в чате команды) |

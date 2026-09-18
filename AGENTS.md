@@ -52,4 +52,4 @@ python -m pytest -q
 
 `src/dxaqc/loader.py` — чтение DICOM, дедуп, два ID · `src/dxaqc/labels.py` — разметка xlsx, официальный словарь,
 масштаб `pixel_mm()` · `scripts/` — скачивание, распаковка, аудит · `docs/` — разбор ТЗ, аудит, ответы, архитектура ·
-`PLAN.md` — вехи M1–M4 · доска: https://github.com/users/dru4elos/projects/2
+`PLAN.md` — вехи M1–M4 · репо: https://github.com/YODA02041994/lct2026-dxa-quality · доска владельца: https://github.com/users/dru4elos/projects/2 (личная, агенту с токеном организации может быть не видна — ориентируйся на issues, вехи и метки)
