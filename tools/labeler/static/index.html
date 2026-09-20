@@ -189,12 +189,12 @@ const SCHEMA = {
      err:'Не путать с L1: у L1 рёбер нет, видны поперечные отростки.',
      why:'Укладка: верхняя граница сканирования проходит примерно через середину тела Th12.'},
     {key:'crest_l', name:'Гребень подвздошной — слева', title:'Гребень подвздошной кости — слева', optional:true,
-     where:'Самая высокая (краниальная) точка контура гребня подвздошной кости в <b>левой части экрана</b>. Гребни на этих снимках очень тёмные — <b>нажмите «Тени+»</b> (клавиша T), они проявятся в нижних углах.',
+     where:'Самая высокая (краниальная) точка контура гребня подвздошной кости в <b>левой части экрана</b>. Гребни — тонкая кость, на карте плотности они очень тёмные, поэтому на этом шаге <b>тени поднимаются сами</b> (кнопка «Тени+», клавиша T). Вершина неясна или срезана краем — ставим самую высокую видимую точку и галочку «видно нечётко».',
      abs:'Гребня нет в кадре <b>даже с «Тени+»</b>.',
      err:'Не поперечный отросток L5 и не газ в кишке. Видна только часть крыла — ставим самую высокую видимую точку и отмечаем «сомневаюсь».',
      why:'Укладка: снизу должны быть видны верхние края обеих подвздошных костей.'},
     {key:'crest_r', name:'Гребень подвздошной — справа', title:'Гребень подвздошной кости — справа', optional:true,
-     where:'Самая высокая (краниальная) точка контура гребня подвздошной кости в <b>правой части экрана</b>. Гребни на этих снимках очень тёмные — <b>нажмите «Тени+»</b> (клавиша T), они проявятся в нижних углах.',
+     where:'Самая высокая (краниальная) точка контура гребня подвздошной кости в <b>правой части экрана</b>. Гребни — тонкая кость, на карте плотности они очень тёмные, поэтому на этом шаге <b>тени поднимаются сами</b> (кнопка «Тени+», клавиша T). Вершина неясна или срезана краем — ставим самую высокую видимую точку и галочку «видно нечётко».',
      abs:'Гребня нет в кадре <b>даже с «Тени+»</b>.',
      err:'Не поперечный отросток L5 и не газ в кишке. Видна только часть крыла — ставим самую высокую видимую точку и отмечаем «сомневаюсь».',
      why:'Укладка: снизу должны быть видны верхние края обеих подвздошных костей.'},
@@ -277,7 +277,7 @@ const SVG_HIP = `
 
 const $ = (id) => document.getElementById(id);
 const cv = $('cv'), ctx = cv.getContext('2d');
-let VIEW = localStorage.getItem('dxa_view') || 'contrast', mouse = null, dpr = 1;
+let VIEW = localStorage.getItem('dxa_view') || 'contrast', mouse = null, dpr = 1, autoTone = false, manualTone = false;
 const proc = document.createElement('canvas'), raw = document.createElement('canvas'); let rawData = null, lutTimer = null;
 function loadRaw() {                       // исходные пиксели снимка — один раз на загрузку
   raw.width = proc.width = img.naturalWidth; raw.height = proc.height = img.naturalHeight;
@@ -337,7 +337,7 @@ function setImage(res) {
   $('unsure').checked = st.unsure; $('comment').value = st.comment;
   $('imgtitle').textContent = `${cur.id} · ${cur.kind === 'spine' ? 'позвоночник' : 'бедро'}${cur.stage === 'overlap' ? ' · общий для всех' : ''}`;
   img = new Image();
-  img.onload = () => { $('empty').hidden = true; $('frame').hidden = false; $('br').value = cur.kind === 'spine' ? 35 : 0; $('shadows').classList.remove('on'); loadRaw(); fit(); active = firstPending(); render(); };
+  img.onload = () => { $('empty').hidden = true; $('frame').hidden = false; $('br').value = cur.kind === 'spine' ? 35 : 0; $('shadows').classList.remove('on'); autoTone = false; manualTone = false; loadRaw(); fit(); active = firstPending(); render(); };
   img.onerror = () => { if (!img.src.endsWith('.png')) img.src = 'img/' + cur.id + '.png'; };
   img.src = 'imgv/' + VIEW + '/' + cur.id + '.jpg';
 }
@@ -386,6 +386,9 @@ function render() {
   document.querySelectorAll('.lbl').forEach(el => el.onclick = () => { active = +el.dataset.i; render(); });
   const act = document.querySelector('.lbl.active'); if (act) act.scrollIntoView({block:'nearest'});
   const l = sc[active]; guide(l, active);
+  { const wantShadows = /^crest_/.test(l.key);                                   // гребни очень тёмные → тени поднимаем сами
+    if (wantShadows && !autoTone && !manualTone) { autoTone = true; $('br').value = 95; $('shadows').classList.add('on'); applyLUT(); }
+    else if (!wantShadows && autoTone) { autoTone = false; $('br').value = cur.kind === 'spine' ? 35 : 0; $('shadows').classList.remove('on'); applyLUT(); } }
   { const n = l.box ? st.boxes.length : pts(l.key).length; $('now').innerHTML = `<span class="dot" style="background:${COLORS[active]}"></span>${allDone() ? 'Всё отмечено — жмите «Готово»' : (l.box ? 'Посторонние предметы: обведите рамкой или «Предметов нет»' : 'Ставим: ' + (l.title || l.name) + (l.multi ? ' · ' + n : ''))}`; }
   $('fuzzy').checked = st.fuzzy.includes(l.key); $('fuzzy').disabled = !!l.box || !pts(l.key).length;
   $('absent').disabled = !l.optional; $('absent').textContent = l.box ? 'Предметов нет' : 'Не видно в кадре'; $('nextlbl').disabled = !(l.multi || l.box);
@@ -460,8 +463,8 @@ $('nextlbl').onclick = nextLabel; $('absent').onclick = markAbsent; $('undo').on
 function setView(v) { VIEW = v; localStorage.setItem('dxa_view', v); $('v-contrast').classList.toggle('on', v === 'contrast'); $('v-sharp').classList.toggle('on', v === 'sharp'); if (cur) { const keep = img; img = new Image(); img.onload = () => { loadRaw(); draw(); }; img.onerror = () => { img = keep; }; img.src = 'imgv/' + v + '/' + cur.id + '.jpg'; } }
 $('v-contrast').onclick = () => setView('contrast'); $('v-sharp').onclick = () => setView('sharp'); $('loupe').onchange = () => { $('loupeBtn').classList.toggle('on', $('loupe').checked); if (cur) draw(); };
 $('loupeBtn').onclick = () => { $('loupe').checked = !$('loupe').checked; $('loupe').onchange(); };
-$('br').oninput = () => { $('shadows').classList.remove('on'); retone(); }; $('ct').oninput = retone;
-$('shadows').onclick = () => { const on = !$('shadows').classList.contains('on'); $('shadows').classList.toggle('on', on); $('br').value = on ? 95 : (cur && cur.kind === 'spine' ? 35 : 0); retone(); }; $('unsure').onchange = changed;
+$('br').oninput = () => { manualTone = true; autoTone = false; $('shadows').classList.remove('on'); retone(); }; $('ct').oninput = retone;
+$('shadows').onclick = () => { manualTone = true; autoTone = false; const on = !$('shadows').classList.contains('on'); $('shadows').classList.toggle('on', on); $('br').value = on ? 95 : (cur && cur.kind === 'spine' ? 35 : 0); retone(); }; $('unsure').onchange = changed;
 $('comment').oninput = () => { dirty = true; clearTimeout(saveTimer); saveTimer = setTimeout(() => save(false), 900); };
 $('help').onclick = () => $('dlg').showModal(); $('dlgok').onclick = () => { $('dlg').close(); localStorage.setItem('dxa_help', '1'); };
 $('change').onclick = pickWho;
