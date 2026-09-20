@@ -198,8 +198,8 @@ const SCHEMA = {
      abs:'Гребня нет в кадре <b>даже с «Тени+»</b>.',
      err:'Не поперечный отросток L5 и не газ в кишке. Видна только часть крыла — ставим самую высокую видимую точку и отмечаем «сомневаюсь».',
      why:'Укладка: снизу должны быть видны верхние края обеих подвздошных костей.'},
-    {key:'artifact', name:'Посторонний предмет — рамка', box:true, multi:true, free:true,
-     where:'Зажмите мышь и обведите <b>рамкой вплотную</b> каждый посторонний предмет: косточки и застёжки белья, пуговицы, молнии, украшения, пирсинг и иные наложения, не относящиеся к телу пациента. Предметов нет — ничего не рисуем.',
+    {key:'artifact', name:'Посторонний предмет — рамка', box:true, multi:true, optional:true,
+     where:'Зажмите мышь и обведите <b>рамкой вплотную</b> каждый посторонний предмет: косточки и застёжки белья, пуговицы, молнии, украшения, пирсинг и иные наложения, не относящиеся к телу пациента. Ищите у верхнего края и по бокам: тонкие яркие дужки и крючки. Предметов нет — кнопка <b>«Предметов нет»</b>.',
      err:'Имплантаты и металлоконструкции рамкой не обводим — пишем в комментарии. Кальцинаты и газ в кишечнике — не предмет.',
      why:'Критерий «посторонние предметы» и показ места нарушения врачу.'},
   ],
@@ -240,8 +240,8 @@ const SCHEMA = {
      err:'Точка лежит на контуре кости, а не внутри неё.',
      why:'Выступание малого вертела и нижняя граница области интереса (снизу нужно не менее 3 см поля).'},
     {key:'ischium', name:'Седалищная кость — низ', title:'Седалищная кость — нижняя точка', optional:true,
-     where:'Самая нижняя точка контура седалищного бугра.',
-     abs:'Седалищная кость в кадр не попала.',
+     where:'Самая нижняя точка контура седалищного бугра. Низ кости <b>срезан чёрной маской или краем кадра</b> — ставим самую нижнюю <b>видимую</b> точку: программа сама определит, что кость обрезана.',
+     abs:'Седалищной кости в кадре нет совсем.',
      err:'Не нижний край лобковой кости и не контур запирательного отверстия.',
      why:'Позиционирование: в кадре должны быть большой вертел, шейка и седалищная кость.'},
     {key:'shaft_top', name:'Диафиз — под малым вертелом', title:'Диафиз — центр под малым вертелом',
@@ -252,8 +252,8 @@ const SCHEMA = {
      where:'Середина между наружным и внутренним кортикальным контуром диафиза <b>у нижнего края кадра</b>.',
      err:'Белый пунктир должен идти по середине кости.',
      why:'Ось диафиза должна быть параллельна вертикали кадра — нет отведения или приведения.'},
-    {key:'artifact', name:'Посторонний предмет — рамка', box:true, multi:true, free:true,
-     where:'Зажмите мышь и обведите <b>рамкой вплотную</b> каждый посторонний предмет: пуговицы, молнии, застёжки, содержимое карманов. Предметов нет — ничего не рисуем.',
+    {key:'artifact', name:'Посторонний предмет — рамка', box:true, multi:true, optional:true,
+     where:'Зажмите мышь и обведите <b>рамкой вплотную</b> каждый посторонний предмет: пуговицы, молнии, застёжки, содержимое карманов. Предметов нет — кнопка <b>«Предметов нет»</b>.',
      err:'Эндопротез и металлоконструкции рамкой не обводим — пишем в комментарии.',
      why:'Критерий «посторонние предметы» и показ места нарушения врачу.'},
   ],
@@ -356,13 +356,13 @@ async function next() {
 
 function pts(key) { return st.points.filter(p => p.label === key); }
 function status(l) {
-  if (l.box) { const n = st.boxes.filter(b => b.label === l.key).length; return n ? ['ok', n + ' шт.'] : ['', 'нет']; }
+  if (l.box) { const n = st.boxes.filter(b => b.label === l.key).length; return n ? ['ok', n + ' шт.'] : (st.absent.includes(l.key) ? ['abs', 'предметов нет'] : ['', '—']); }
   if (st.absent.includes(l.key)) return ['abs', 'не видно'];
   const n = pts(l.key).length;
   if (l.multi) return n >= (l.min || 1) ? ['ok', n + ' точек'] : ['', n ? n + ' — мало' : '—'];
   return n ? ['ok', st.fuzzy.includes(l.key) ? '✓ нечётко' : '✓'] : ['', '—'];
 }
-function complete(l) { const s = status(l)[0]; return l.free || s === 'ok' || s === 'abs'; }
+function complete(l) { const s = status(l)[0]; return s === 'ok' || s === 'abs'; }
 function firstPending() { const i = schema().findIndex(l => !complete(l)); return i < 0 ? schema().length - 1 : i; }
 function allDone() { return schema().every(complete); }
 
@@ -386,9 +386,9 @@ function render() {
   document.querySelectorAll('.lbl').forEach(el => el.onclick = () => { active = +el.dataset.i; render(); });
   const act = document.querySelector('.lbl.active'); if (act) act.scrollIntoView({block:'nearest'});
   const l = sc[active]; guide(l, active);
-  { const n = l.box ? st.boxes.length : pts(l.key).length; $('now').innerHTML = `<span class="dot" style="background:${COLORS[active]}"></span>${allDone() && l.free ? 'Всё отмечено — жмите «Готово» (или обведите посторонний предмет)' : 'Ставим: ' + (l.title || l.name) + (l.multi ? ' · ' + n : '')}`; }
+  { const n = l.box ? st.boxes.length : pts(l.key).length; $('now').innerHTML = `<span class="dot" style="background:${COLORS[active]}"></span>${allDone() ? 'Всё отмечено — жмите «Готово»' : (l.box ? 'Посторонние предметы: обведите рамкой или «Предметов нет»' : 'Ставим: ' + (l.title || l.name) + (l.multi ? ' · ' + n : ''))}`; }
   $('fuzzy').checked = st.fuzzy.includes(l.key); $('fuzzy').disabled = !!l.box || !pts(l.key).length;
-  $('absent').disabled = !l.optional; $('nextlbl').disabled = !(l.multi || l.box);
+  $('absent').disabled = !l.optional; $('absent').textContent = l.box ? 'Предметов нет' : 'Не видно в кадре'; $('nextlbl').disabled = !(l.multi || l.box);
   $('done').disabled = !allDone();
   draw();
 }
@@ -435,7 +435,7 @@ cv.addEventListener('mouseleave', () => { mouse = null; if (cur) draw(); });
 window.addEventListener('mousemove', e => { if (!cur) return; if (e.target === cv) { mouse = pos(e); if (!drag && !boxStart) draw(); }
   if (drag) { const p = pos(e); drag.x = +p.x.toFixed(2); drag.y = +p.y.toFixed(2); draw(); } else if (boxStart) { boxStart.cur = pos(e); draw(); } });
 window.addEventListener('mouseup', () => { if (drag) { drag = null; changed(); }
-  if (boxStart) { const c = boxStart.cur; if (c && Math.abs(c.x - boxStart.x) > 3 && Math.abs(c.y - boxStart.y) > 3) { snap(); st.boxes.push({label: 'artifact', x1: +Math.min(c.x, boxStart.x).toFixed(1), y1: +Math.min(c.y, boxStart.y).toFixed(1), x2: +Math.max(c.x, boxStart.x).toFixed(1), y2: +Math.max(c.y, boxStart.y).toFixed(1)}); }
+  if (boxStart) { const c = boxStart.cur; if (c && Math.abs(c.x - boxStart.x) > 3 && Math.abs(c.y - boxStart.y) > 3) { snap(); st.absent = st.absent.filter(k => k !== 'artifact'); st.boxes.push({label: 'artifact', x1: +Math.min(c.x, boxStart.x).toFixed(1), y1: +Math.min(c.y, boxStart.y).toFixed(1), x2: +Math.max(c.x, boxStart.x).toFixed(1), y2: +Math.max(c.y, boxStart.y).toFixed(1)}); }
     boxStart = null; changed(); } });
 
 function markAbsent() { const l = schema()[active]; if (!l.optional) return; snap();

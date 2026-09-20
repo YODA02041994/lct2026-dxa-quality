@@ -269,7 +269,7 @@ def save(payload: dict = Body(...)):
         "points": payload.get("points", [])[:60], "boxes": payload.get("boxes", [])[:30],
         "absent": payload.get("absent", [])[:20], "fuzzy": payload.get("fuzzy", [])[:20], "unsure": bool(payload.get("unsure")),
         "comment": str(payload.get("comment", ""))[:500], "done": bool(payload.get("done")),
-        "seconds": payload.get("seconds"), "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"), "tool": "labeler-2",
+        "seconds": payload.get("seconds"), "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"), "tool": "labeler-3",
     }
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
