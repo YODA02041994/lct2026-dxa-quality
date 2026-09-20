@@ -51,12 +51,27 @@ python scripts/unpack_data.py
 PYTHONPATH=src python scripts/audit_dataset.py
 ```
 
+## Запуск сервиса
+
+```bash
+PYTHONPATH=src python -m dxaqc run --input <папка или zip с DICOM> --output <папка результатов>
+```
+
+На выходе `results.xlsx` (основной) и `results.csv` (UTF-8 с BOM, разделитель `;`, десятичная точка), плюс `run.log`.
+**Строка на каждый файл**, включая дубликаты. Колонки: сначала официальные из ТЗ в исходном порядке
+(`path_to_study, study_uid, image_uid, anatomical_region, quality_class, violation_type, quality_prob,
+processing_status, time_of_processing`), затем служебные (`study_dir, side, duplicate_of, error_message`).
+Битый или не-DICOM файл не роняет обработку: строка получает `processing_status = Failure`, причина — в `error_message`.
+
+> Сейчас вместо модели стоит заглушка (`NullPredictor`: «нарушений нет»). Формат, обход входа, дедупликация и
+> обработка ошибок — настоящие; модель подключается в `src/dxaqc/predict.py`.
+
 ## Что сдаём 29.09 (чеклист из ТЗ)
 
 - [ ] обученная модель и веса
 - [ ] Docker-контейнер, скрипт сборки и запуска под Linux, работа **без интернета**
 - [ ] CLI/API пакетной обработки папки или архива исследований → `results.xlsx`/`.csv`
-- [ ] одна строка = одно изображение: `path_to_study, study_uid, image_uid, anatomical_region, quality_class, violation_type, processing_status, time_of_processing` (+ `quality_score`)
+- [ ] одна строка = одно изображение: `path_to_study, study_uid, image_uid, anatomical_region, quality_class, violation_type, processing_status, time_of_processing` (+ `quality_prob`)
 - [ ] ≤ 3 мин на исследование, без необработанных исключений, воспроизводимость
 - [ ] README, руководство пользователя, руководство по развёртыванию, описание обучения
 - [ ] презентация по шаблону + демонстрационный сценарий
