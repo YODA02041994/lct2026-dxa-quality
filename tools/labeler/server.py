@@ -267,7 +267,7 @@ def save(payload: dict = Body(...)):
     rec = {
         "image_id": iid, "annotator": who, "kind": payload.get("kind"),
         "points": payload.get("points", [])[:60], "boxes": payload.get("boxes", [])[:30],
-        "absent": payload.get("absent", [])[:20], "unsure": bool(payload.get("unsure")),
+        "absent": payload.get("absent", [])[:20], "fuzzy": payload.get("fuzzy", [])[:20], "unsure": bool(payload.get("unsure")),
         "comment": str(payload.get("comment", ""))[:500], "done": bool(payload.get("done")),
         "seconds": payload.get("seconds"), "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"), "tool": "labeler-2",
     }

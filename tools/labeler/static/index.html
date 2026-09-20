@@ -124,7 +124,8 @@
     <section class="card grow">
       <span class="eyebrow" id="imgtitle" style="align-self:flex-start">Снимок</span>
       <div id="labels"></div>
-      <div class="row" style="margin-top:12px">
+      <div class="row" style="margin-top:10px"><label title="Структура угадывается, но контур нечёткий — точка стоит приблизительно"><input type="checkbox" id="fuzzy"> текущая точка: видно нечётко</label></div>
+      <div class="row" style="margin-top:10px">
         <button class="btn btn-teal" id="nextlbl" title="Следующий ориентир (Пробел)">Дальше →</button>
         <button class="btn btn-ghost" id="absent" title="Структуры нет в кадре (клавиша N)">Не видно в кадре</button>
         <button class="btn btn-ghost" id="undo" title="Отменить последнее действие (⌘Z / Ctrl+Z)" style="padding:10px 14px">↶</button>
@@ -223,9 +224,9 @@ const SCHEMA = {
      why:'Позиционирование: шейка целиком в кадре; ось шейки.'},
     {key:'lt_tip', name:'Малый вертел — вершина', optional:true, cascade:['lt_up','lt_down'],
      where:'Вершина малого вертела — наиболее выступающая <b>медиально</b> точка его контура.',
-     abs:'Малый вертел не контурируется: медиальный контур кости ровный. Так выглядит избыточная внутренняя ротация.',
-     err:'Не дуга Адамса и не наложение седалищной кости.',
-     why:'Ротация: при правильной укладке (внутренняя ротация 15–25°) малый вертел — небольшой выступ; крупный — ротация недостаточна.'},
+     abs:'Медиальный контур кости под шейкой ровный, выступа нет совсем. Это <b>не обязательно нарушение</b> — при хорошей внутренней ротации вертел почти скрыт. Просто отмечаем, что его не видно.',
+     err:'Не дуга Адамса и не наложение седалищной кости. Вертел угадывается слабой тенью, но контура нет — ставим точку и отмечаем <b>«видно нечётко»</b>.',
+     why:'Ротация: при правильной укладке (внутренняя ротация 15–25°) малый вертел мал или почти не виден; крупный выступ — ротация недостаточна. Где граница нормы, решит программа по меткам экспертов — вы только показываете, что видно.'},
     {key:'lt_up', name:'Малый вертел — верх. основание', title:'Малый вертел — верхнее основание', optional:true,
      where:'Точка, где контур малого вертела <b>сверху</b> переходит в ровный медиальный контур кости (в сторону шейки).',
      abs:'Ставится автоматически, если вершина «не видна».',
@@ -242,8 +243,8 @@ const SCHEMA = {
      err:'Не нижний край лобковой кости и не контур запирательного отверстия.',
      why:'Позиционирование: в кадре должны быть большой вертел, шейка и седалищная кость.'},
     {key:'shaft_top', name:'Диафиз — под малым вертелом', title:'Диафиз — центр под малым вертелом',
-     where:'Середина между наружным и внутренним кортикальным контуром диафиза <b>сразу дистальнее малого вертела</b>.',
-     err:'Именно середина поперечника кости, а не костномозгового канала у одной из стенок.',
+     where:'Середина между наружным и внутренним кортикальным контуром диафиза <b>сразу дистальнее малого вертела</b>. Вертела не видно — на уровне, где медиальный контур под шейкой становится прямым (обычно 2–3 см ниже нижней точки шейки).',
+     err:'Именно середина поперечника кости. Не ставьте слишком низко: чем дальше эта точка от нижней, тем точнее ось.',
      why:'Ось диафиза должна быть параллельна вертикали кадра — нет отведения или приведения.'},
     {key:'shaft_bot', name:'Диафиз — у нижнего края', title:'Диафиз — центр у нижнего края',
      where:'Середина между наружным и внутренним кортикальным контуром диафиза <b>у нижнего края кадра</b>.',
@@ -277,7 +278,7 @@ const cv = $('cv'), ctx = cv.getContext('2d');
 let VIEW = localStorage.getItem('dxa_view') || 'contrast', mouse = null, dpr = 1;
 let cur = null, img = new Image(), scale = 3, active = 0, st = null, drag = null, boxStart = null, history = [], t0 = 0, saveTimer = null, dirty = false, WHO = localStorage.getItem('dxa_who') || '';
 
-function blank() { return {points:[], boxes:[], absent:[], unsure:false, comment:''}; }
+function blank() { return {points:[], boxes:[], absent:[], fuzzy:[], unsure:false, comment:''}; }
 function schema() { return SCHEMA[cur.kind]; }
 async function api(path, opts) {
   const r = await fetch(path, opts);
@@ -314,7 +315,7 @@ function setImage(res) {
   showState(res.state);
   if (!res.image) { cur = null; $('frame').hidden = true; $('empty').hidden = false; $('empty').innerHTML = '<h2>Очередь пуста</h2><p>Все снимки размечены. Спасибо за работу!</p>'; $('labels').innerHTML = ''; return; }
   cur = res.image; const a = res.annotation;
-  st = a ? {points:a.points || [], boxes:a.boxes || [], absent:a.absent || [], unsure:!!a.unsure, comment:a.comment || ''} : blank();
+  st = a ? {points:a.points || [], boxes:a.boxes || [], absent:a.absent || [], fuzzy:a.fuzzy || [], unsure:!!a.unsure, comment:a.comment || ''} : blank();
   history = []; dirty = false; t0 = Date.now(); say('');
   $('unsure').checked = st.unsure; $('comment').value = st.comment;
   $('imgtitle').textContent = `${cur.id} · ${cur.kind === 'spine' ? 'позвоночник' : 'бедро'}${cur.stage === 'overlap' ? ' · общий для всех' : ''}`;
@@ -342,7 +343,7 @@ function status(l) {
   if (st.absent.includes(l.key)) return ['abs', 'не видно'];
   const n = pts(l.key).length;
   if (l.multi) return n >= (l.min || 1) ? ['ok', n + ' точек'] : ['', n ? n + ' — мало' : '—'];
-  return n ? ['ok', '✓'] : ['', '—'];
+  return n ? ['ok', st.fuzzy.includes(l.key) ? '✓ нечётко' : '✓'] : ['', '—'];
 }
 function complete(l) { const s = status(l)[0]; return l.free || s === 'ok' || s === 'abs'; }
 function firstPending() { const i = schema().findIndex(l => !complete(l)); return i < 0 ? schema().length - 1 : i; }
@@ -368,6 +369,7 @@ function render() {
   document.querySelectorAll('.lbl').forEach(el => el.onclick = () => { active = +el.dataset.i; render(); });
   const act = document.querySelector('.lbl.active'); if (act) act.scrollIntoView({block:'nearest'});
   const l = sc[active]; guide(l, active);
+  $('fuzzy').checked = st.fuzzy.includes(l.key); $('fuzzy').disabled = !!l.box || !pts(l.key).length;
   $('absent').disabled = !l.optional; $('nextlbl').disabled = !(l.multi || l.box);
   $('done').disabled = !allDone();
   draw();
@@ -428,7 +430,7 @@ function nextLabel() { const n = schema().findIndex((x, i) => i > active && !com
 async function save(done) {
   if (!cur || !WHO) return;
   st.unsure = $('unsure').checked; st.comment = $('comment').value;
-  const body = {annotator: WHO, image_id: cur.id, kind: cur.kind, points: st.points, boxes: st.boxes, absent: st.absent, unsure: st.unsure, comment: st.comment, done: !!done, seconds: Math.round((Date.now() - t0) / 1000)};
+  const body = {annotator: WHO, image_id: cur.id, kind: cur.kind, points: st.points, boxes: st.boxes, absent: st.absent, fuzzy: st.fuzzy.filter(k => st.points.some(p => p.label === k)), unsure: st.unsure, comment: st.comment, done: !!done, seconds: Math.round((Date.now() - t0) / 1000)};
   try { const r = await api('api/save', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)}); showState(r.state); dirty = false; if (!done) say('сохранено ✓', 'ok'); return true; }
   catch (e) { say('не сохранилось: ' + e.message, 'bad'); return false; }
 }
@@ -436,6 +438,7 @@ async function finish() { if (!cur) return; if (!allDone()) { say('Остали�
 async function skip() { if (!cur) return; clearTimeout(saveTimer); if (dirty) await save(false);
   await api('api/release', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({annotator: WHO, image_id: cur.id})}).catch(() => {}); next(); }
 
+$('fuzzy').onchange = () => { const k = schema()[active].key; snap(); st.fuzzy = st.fuzzy.filter(x => x !== k); if ($('fuzzy').checked) st.fuzzy.push(k); changed(); };
 $('nextlbl').onclick = nextLabel; $('absent').onclick = markAbsent; $('undo').onclick = undo; $('done').onclick = finish; $('skip').onclick = skip;
 function setView(v) { VIEW = v; localStorage.setItem('dxa_view', v); $('v-contrast').classList.toggle('on', v === 'contrast'); $('v-sharp').classList.toggle('on', v === 'sharp'); if (cur) { const keep = img; img = new Image(); img.onload = () => draw(); img.onerror = () => { img = keep; }; img.src = 'imgv/' + v + '/' + cur.id + '.jpg'; } }
 $('v-contrast').onclick = () => setView('contrast'); $('v-sharp').onclick = () => setView('sharp'); $('loupe').onchange = () => { localStorage.setItem('dxa_loupe', $('loupe').checked ? '1' : '0'); draw(); };
