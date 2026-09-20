@@ -47,7 +47,8 @@
   .g-row dd { margin:0; font-weight:600; color:var(--ink); }
   .rules { font-size:13.5px; font-weight:600; color:var(--ink-2); margin:0; padding-left:18px; } .rules li { margin:5px 0; }
   #stage { display:flex; align-items:flex-start; justify-content:center; min-height:0; overflow:auto; }
-  #frame { border:3px solid var(--ink); border-radius:20px; overflow:hidden; box-shadow:var(--hs); background:#000; line-height:0; }
+  #frame { border:3px solid var(--ink); border-radius:12px; padding:6px; box-shadow:var(--hs); background:#000; line-height:0; }
+  .seg { display:inline-flex; border:2.5px solid var(--ink); border-radius:999px; overflow:hidden; } .seg button { font:inherit; font-weight:800; font-size:13px; padding:5px 12px; border:0; background:#fff; color:var(--ink); cursor:pointer; } .seg button.on { background:var(--ink); color:#fff; }
   canvas { cursor:crosshair; display:block; }
   #empty { margin:60px auto; text-align:center; max-width:460px; }
   #empty h2 { font-size:26px; margin-bottom:10px; } #empty p { color:var(--muted); font-weight:600; }
@@ -130,7 +131,8 @@
       </div>
     </section>
     <section class="card fixed">
-      <div class="row" style="gap:8px"><label title="Яркость">☀︎</label><input type="range" id="br" min="60" max="260" value="120"><label title="Контраст">◐</label><input type="range" id="ct" min="60" max="260" value="120"><label style="margin-left:auto"><input type="checkbox" id="unsure"> сомневаюсь</label></div>
+      <div class="row" style="gap:8px"><label title="Яркость">☀︎</label><input type="range" id="br" min="60" max="260" value="100"><label title="Контраст">◐</label><input type="range" id="ct" min="60" max="260" value="100"><label style="margin-left:auto"><input type="checkbox" id="unsure"> сомневаюсь</label></div>
+      <div class="row" style="gap:8px"><span class="seg" title="Как показывать снимок (клавиша C)"><button id="v-contrast">Контраст+</button><button id="v-sharp">Чёткий</button></span><label title="Увеличение под курсором (клавиша L)"><input type="checkbox" id="loupe" checked> лупа</label></div>
       <div class="row"><textarea id="comment" placeholder="Комментарий (необязательно): эндопротез, сколиоз, плохо видно…"></textarea></div>
       <div class="row">
         <button class="btn btn-primary" id="done" title="Снимок размечен (Enter)">Готово → следующий</button>
@@ -165,7 +167,7 @@
     <li>Сомневаетесь — поставьте галочку «сомневаюсь»: снимок посмотрит ещё кто-то.</li>
   </ul>
   <h3>Клавиши</h3>
-  <p><kbd>1</kbd>…<kbd>0</kbd> выбрать ориентир · <kbd>Пробел</kbd> следующий · <kbd>N</kbd> не видно · <kbd>⌘Z</kbd> / <kbd>Ctrl+Z</kbd> отменить · <kbd>Enter</kbd> готово · <kbd>S</kbd> пропустить снимок. Всё то же доступно кнопками.</p>
+  <p><kbd>1</kbd>…<kbd>0</kbd> выбрать ориентир · <kbd>Пробел</kbd> следующий · <kbd>N</kbd> не видно · <kbd>⌘Z</kbd> / <kbd>Ctrl+Z</kbd> отменить · <kbd>Enter</kbd> готово · <kbd>S</kbd> пропустить снимок · <kbd>C</kbd> вид «контраст+ / чёткий» · <kbd>L</kbd> лупа. Всё то же доступно кнопками.</p>
   <p>Точное определение каждого ориентира со схемой всегда показано в левой колонке — для той точки, которую вы ставите сейчас.</p>
   <div class="row" style="margin-top:18px"><button class="btn btn-primary btn-lg" id="dlgok">Понятно, начать</button></div>
 </dialog>
@@ -272,6 +274,7 @@ const SVG_HIP = `
 
 const $ = (id) => document.getElementById(id);
 const cv = $('cv'), ctx = cv.getContext('2d');
+let VIEW = localStorage.getItem('dxa_view') || 'contrast', mouse = null, dpr = 1;
 let cur = null, img = new Image(), scale = 3, active = 0, st = null, drag = null, boxStart = null, history = [], t0 = 0, saveTimer = null, dirty = false, WHO = localStorage.getItem('dxa_who') || '';
 
 function blank() { return {points:[], boxes:[], absent:[], unsure:false, comment:''}; }
@@ -317,12 +320,15 @@ function setImage(res) {
   $('imgtitle').textContent = `${cur.id} · ${cur.kind === 'spine' ? 'позвоночник' : 'бедро'}${cur.stage === 'overlap' ? ' · общий для всех' : ''}`;
   img = new Image();
   img.onload = () => { $('empty').hidden = true; $('frame').hidden = false; fit(); active = firstPending(); render(); };
-  img.src = 'img/' + cur.id + '.png';
+  img.onerror = () => { if (!img.src.endsWith('.png')) img.src = 'img/' + cur.id + '.png'; };
+  img.src = 'imgv/' + VIEW + '/' + cur.id + '.jpg';
 }
 function fit() {
   const box = $('stage').getBoundingClientRect();
-  scale = Math.max(1.4, Math.min(4, (box.height - 14) / cur.h, (box.width - 20) / cur.w));
-  cv.width = Math.round(cur.w * scale); cv.height = Math.round(cur.h * scale);
+  scale = Math.max(1.4, Math.min(4, (box.height - 32) / cur.h, (box.width - 36) / cur.w));
+  dpr = window.devicePixelRatio || 1;
+  const cw = Math.round(cur.w * scale), ch = Math.round(cur.h * scale);
+  cv.style.width = cw + 'px'; cv.style.height = ch + 'px'; cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
 }
 async function next() {
   if (!WHO) return pickWho();
@@ -369,13 +375,26 @@ function render() {
 function draw() {
   ctx.save(); ctx.filter = `brightness(${$('br').value}%) contrast(${$('ct').value}%)`; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(img, 0, 0, cv.width, cv.height); ctx.restore();
-  const sc = schema(), S = scale, P = (k) => pts(k)[0];
-  const line = (a, b, col, dash) => { if (!a || !b) return; ctx.beginPath(); ctx.setLineDash(dash || []); ctx.moveTo(a.x * S, a.y * S); ctx.lineTo(b.x * S, b.y * S); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]); };
+  const sc = schema(), S = scale * dpr, P = (k) => pts(k)[0];
+  const line = (a, b, col, dash) => { if (!a || !b) return; ctx.beginPath(); ctx.setLineDash(dash || []); ctx.moveTo(a.x * S, a.y * S); ctx.lineTo(b.x * S, b.y * S); ctx.strokeStyle = col; ctx.lineWidth = 2 * dpr; ctx.stroke(); ctx.setLineDash([]); };
   if (cur.kind === 'spine') { const v = pts('vb').slice().sort((a, b) => a.y - b.y); for (let i = 1; i < v.length; i++) line(v[i - 1], v[i], '#FFD24D'); }
   else { line(P('neck_sup'), P('neck_inf'), '#FF7A59'); line(P('shaft_top'), P('shaft_bot'), '#FFFFFF', [6, 5]); line(P('lt_up'), P('lt_tip'), '#35D0BA'); line(P('lt_tip'), P('lt_down'), '#35D0BA'); line(P('lt_up'), P('lt_down'), '#35D0BA', [3, 3]); }
-  st.boxes.forEach(b => { ctx.strokeStyle = '#FF5A5A'; ctx.lineWidth = 2.5; ctx.strokeRect(b.x1 * S, b.y1 * S, (b.x2 - b.x1) * S, (b.y2 - b.y1) * S); });
-  if (boxStart && boxStart.cur) { ctx.strokeStyle = '#FF5A5A'; ctx.setLineDash([5, 4]); ctx.strokeRect(boxStart.x * S, boxStart.y * S, (boxStart.cur.x - boxStart.x) * S, (boxStart.cur.y - boxStart.y) * S); ctx.setLineDash([]); }
-  st.points.forEach(p => { const i = sc.findIndex(l => l.key === p.label); ctx.beginPath(); ctx.arc(p.x * S, p.y * S, 5.5, 0, 7); ctx.fillStyle = COLORS[i]; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke(); });
+  st.boxes.forEach(b => { ctx.strokeStyle = '#FF5A5A'; ctx.lineWidth = 2.5 * dpr; ctx.strokeRect(b.x1 * S, b.y1 * S, (b.x2 - b.x1) * S, (b.y2 - b.y1) * S); });
+  if (boxStart && boxStart.cur) { ctx.strokeStyle = '#FF5A5A'; ctx.lineWidth = 2 * dpr; ctx.setLineDash([5 * dpr, 4 * dpr]); ctx.strokeRect(boxStart.x * S, boxStart.y * S, (boxStart.cur.x - boxStart.x) * S, (boxStart.cur.y - boxStart.y) * S); ctx.setLineDash([]); }
+  st.points.forEach(p => { const i = sc.findIndex(l => l.key === p.label); ctx.beginPath(); ctx.arc(p.x * S, p.y * S, 5.5 * dpr, 0, 7); ctx.fillStyle = COLORS[i]; ctx.fill(); ctx.lineWidth = 2 * dpr; ctx.strokeStyle = '#fff'; ctx.stroke(); });
+  if ($('loupe').checked && mouse && !drag && !boxStart) {                       // лупа: участок под курсором в 2,4 раза крупнее
+    const R = 78 * dpr, Z = 2.4, kx = img.naturalWidth / cur.w, ky = img.naturalHeight / cur.h;
+    const half = (R / S) / Z, cx = mouse.x * S, cy = mouse.y * S;
+    let lx = cx + 96 * dpr, ly = cy - 96 * dpr;
+    if (lx + R > cv.width) lx = cx - 96 * dpr; if (ly - R < 0) ly = cy + 96 * dpr;
+    ctx.save(); ctx.beginPath(); ctx.arc(lx, ly, R, 0, 7); ctx.clip();
+    ctx.filter = `brightness(${$('br').value}%) contrast(${$('ct').value}%)`; ctx.fillStyle = '#000'; ctx.fillRect(lx - R, ly - R, 2 * R, 2 * R);
+    ctx.drawImage(img, (mouse.x - half) * kx, (mouse.y - half) * ky, 2 * half * kx, 2 * half * ky, lx - R, ly - R, 2 * R, 2 * R);
+    ctx.filter = 'none';
+    st.points.forEach(p => { const dx = (p.x - mouse.x) * S * Z, dy = (p.y - mouse.y) * S * Z; if (Math.hypot(dx, dy) < R) { const i = sc.findIndex(l => l.key === p.label); ctx.beginPath(); ctx.arc(lx + dx, ly + dy, 4 * dpr, 0, 7); ctx.fillStyle = COLORS[i]; ctx.fill(); ctx.lineWidth = 1.5 * dpr; ctx.strokeStyle = '#fff'; ctx.stroke(); } });
+    ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1 * dpr; ctx.beginPath(); ctx.moveTo(lx - 12 * dpr, ly); ctx.lineTo(lx - 3 * dpr, ly); ctx.moveTo(lx + 3 * dpr, ly); ctx.lineTo(lx + 12 * dpr, ly); ctx.moveTo(lx, ly - 12 * dpr); ctx.lineTo(lx, ly - 3 * dpr); ctx.moveTo(lx, ly + 3 * dpr); ctx.lineTo(lx, ly + 12 * dpr); ctx.stroke();
+    ctx.restore(); ctx.beginPath(); ctx.arc(lx, ly, R, 0, 7); ctx.lineWidth = 3 * dpr; ctx.strokeStyle = '#FFF9F2'; ctx.stroke();
+  }
 }
 function pos(e) { const r = cv.getBoundingClientRect(); return {x: Math.max(0, Math.min(cur.w, (e.clientX - r.left) / scale)), y: Math.max(0, Math.min(cur.h, (e.clientY - r.top) / scale))}; }
 function hit(p) { let best = null, bd = 9 / scale; st.points.forEach(o => { const d = Math.hypot(o.x - p.x, o.y - p.y); if (d < bd) { bd = d; best = o; } }); return best; }
@@ -393,7 +412,9 @@ cv.addEventListener('mousedown', e => { if (e.button !== 0 || !cur) return; cons
   if (l.multi) st.points.push(pt);
   else { st.points = st.points.filter(o => o.label !== l.key); st.points.push(pt); const n = schema().findIndex((x, i) => i > active && !complete(x)); active = n >= 0 ? n : firstPending(); }
   changed(); });
-window.addEventListener('mousemove', e => { if (!cur) return; if (drag) { const p = pos(e); drag.x = +p.x.toFixed(2); drag.y = +p.y.toFixed(2); draw(); } else if (boxStart) { boxStart.cur = pos(e); draw(); } });
+cv.addEventListener('mouseleave', () => { mouse = null; if (cur) draw(); });
+window.addEventListener('mousemove', e => { if (!cur) return; if (e.target === cv) { mouse = pos(e); if (!drag && !boxStart) draw(); }
+  if (drag) { const p = pos(e); drag.x = +p.x.toFixed(2); drag.y = +p.y.toFixed(2); draw(); } else if (boxStart) { boxStart.cur = pos(e); draw(); } });
 window.addEventListener('mouseup', () => { if (drag) { drag = null; changed(); }
   if (boxStart) { const c = boxStart.cur; if (c && Math.abs(c.x - boxStart.x) > 3 && Math.abs(c.y - boxStart.y) > 3) { snap(); st.boxes.push({label: 'artifact', x1: +Math.min(c.x, boxStart.x).toFixed(1), y1: +Math.min(c.y, boxStart.y).toFixed(1), x2: +Math.max(c.x, boxStart.x).toFixed(1), y2: +Math.max(c.y, boxStart.y).toFixed(1)}); }
     boxStart = null; changed(); } });
@@ -416,6 +437,8 @@ async function skip() { if (!cur) return; clearTimeout(saveTimer); if (dirty) aw
   await api('api/release', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({annotator: WHO, image_id: cur.id})}).catch(() => {}); next(); }
 
 $('nextlbl').onclick = nextLabel; $('absent').onclick = markAbsent; $('undo').onclick = undo; $('done').onclick = finish; $('skip').onclick = skip;
+function setView(v) { VIEW = v; localStorage.setItem('dxa_view', v); $('v-contrast').classList.toggle('on', v === 'contrast'); $('v-sharp').classList.toggle('on', v === 'sharp'); if (cur) { const keep = img; img = new Image(); img.onload = () => draw(); img.onerror = () => { img = keep; }; img.src = 'imgv/' + v + '/' + cur.id + '.jpg'; } }
+$('v-contrast').onclick = () => setView('contrast'); $('v-sharp').onclick = () => setView('sharp'); $('loupe').onchange = () => { localStorage.setItem('dxa_loupe', $('loupe').checked ? '1' : '0'); draw(); };
 $('br').oninput = draw; $('ct').oninput = draw; $('unsure').onchange = changed;
 $('comment').oninput = () => { dirty = true; clearTimeout(saveTimer); saveTimer = setTimeout(() => save(false), 900); };
 $('help').onclick = () => $('dlg').showModal(); $('dlgok').onclick = () => { $('dlg').close(); localStorage.setItem('dxa_help', '1'); };
@@ -427,10 +450,12 @@ window.addEventListener('keydown', e => { if (['INPUT', 'TEXTAREA', 'SELECT'].in
   const k = e.key.toLowerCase();
   if ((e.metaKey || e.ctrlKey) && (k === 'z' || k === 'я')) { e.preventDefault(); undo(); return; }
   if (e.key === 'Enter') { e.preventDefault(); finish(); } else if (e.key === ' ') { e.preventDefault(); nextLabel(); }
+  else if (k === 'c' || k === 'с') setView(VIEW === 'contrast' ? 'sharp' : 'contrast'); else if (k === 'l' || k === 'д') { $('loupe').checked = !$('loupe').checked; $('loupe').onchange(); }
   else if (k === 'n' || k === 'т') markAbsent(); else if (k === 's' || k === 'ы') skip();
   else if (/^[0-9]$/.test(e.key)) { const i = (+e.key + 9) % 10; if (i < schema().length) { active = i; render(); } } });
 window.addEventListener('beforeunload', () => { if (dirty) save(false); });
 
+$('loupe').checked = localStorage.getItem('dxa_loupe') !== '0'; $('v-contrast').classList.toggle('on', VIEW === 'contrast'); $('v-sharp').classList.toggle('on', VIEW === 'sharp');
 if (WHO) { setWho(WHO); next(); } else pickWho();
 </script>
 </body>

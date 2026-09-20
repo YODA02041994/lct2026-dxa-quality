@@ -172,6 +172,15 @@ def img(iid: str):
     return FileResponse(p, headers={"Cache-Control": "private, max-age=86400"})
 
 
+@app.get("/imgv/{variant}/{iid}.jpg")
+def img_view(variant: str, iid: str):
+    """Увеличенные версии для показа: sharp — чёткая, contrast — с локальным контрастом."""
+    p = os.path.join(DATA, "view", variant, iid + ".jpg")
+    if variant not in ("sharp", "contrast") or not re.fullmatch(r"\d{3}_(spine|hipR|hipL)", iid) or not os.path.exists(p):
+        raise HTTPException(404)
+    return FileResponse(p, headers={"Cache-Control": "private, max-age=86400"})
+
+
 @app.get("/api/config")
 def config():
     return {"names": NAMES, "lease_min": LEASE_MIN, "password": bool(PASSWORD)}

@@ -7,8 +7,9 @@
     PYTHONPATH=src python tools/labeler/prepare.py
 """
 import csv, json, os, random, sys
+import cv2
 import pydicom
-from PIL import Image
+from PIL import Image, ImageFilter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT = os.path.join(ROOT, "data", "work", "labeler")
@@ -16,12 +17,22 @@ SP = "Поясничный отдел позвоночника"
 
 rows = list(csv.DictReader(open(os.path.join(ROOT, "data/work/manifest.csv"), encoding="utf-8-sig")))
 os.makedirs(os.path.join(OUT, "png"), exist_ok=True)
+for v in ("sharp", "contrast"):
+    os.makedirs(os.path.join(OUT, "view", v), exist_ok=True)
+UPSCALE = 4
 items = []
 for r in rows:
     kind = "spine" if r["region"] == SP else "hip"
     iid = f"{int(r['num']):03d}_{'spine' if kind == 'spine' else 'hip' + r['side']}"
     a = pydicom.dcmread(os.path.join(ROOT, r["path"]), force=True).pixel_array
     Image.fromarray(a).save(os.path.join(OUT, "png", iid + ".png"))
+    # Версии для показа разметчику: ×4 Lanczos + лёгкое подчёркивание краёв. Координаты разметки остаются
+    # в пикселях ИСХОДНОГО снимка — увеличение влияет только на то, как человек видит картинку.
+    big = (a.shape[1] * UPSCALE, a.shape[0] * UPSCALE)
+    sharp = ImageFilter.UnsharpMask(radius=2.5, percent=90, threshold=2)
+    Image.fromarray(a).resize(big, Image.LANCZOS).filter(sharp).save(os.path.join(OUT, "view", "sharp", iid + ".jpg"), quality=93)
+    eq = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(6, 6)).apply(a)          # локальный контраст: лучше видны вертелы и контуры
+    Image.fromarray(eq).resize(big, Image.LANCZOS).filter(sharp).save(os.path.join(OUT, "view", "contrast", iid + ".jpg"), quality=93)
     rare = any(r[c] == "1" for c in ("spine_positioning", "spine_axis_tilt", "hip_roi_field"))
     items.append({"id": iid, "kind": kind, "side": r["side"], "w": int(r["cols"]), "h": int(r["rows"]),
                   "_rare": rare, "_viol": r["truth"] == "1"})
