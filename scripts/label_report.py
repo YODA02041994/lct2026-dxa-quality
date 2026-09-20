@@ -52,14 +52,15 @@ def features(a: dict, img: np.ndarray) -> dict:
     mm = MM.get(w, 0.6)
     f: dict = {}
     if a["kind"] == "spine":
-        vb = sorted(P["vb"], key=lambda t: t[1])
+        vb = sorted(P["vb"] + [P[k][0] for k in ("L1", "L2", "L3", "L4", "L5") if P[k]], key=lambda t: t[1])   # старый и новый формат
+        f["levels"] = "".join(k[1] if P[k] else ("-" if k in absent else "?") for k in ("L1", "L2", "L3", "L4", "L5")) if not P["vb"] else "без уровней"
         if len(vb) >= 2:
             f["axis_deg"] = round(abs(math.degrees(math.atan(np.polyfit([v[1] for v in vb], [v[0] for v in vb], 1)[0]))), 1)
             f["axis_end2end_deg"] = round(abs(math.degrees(math.atan2(vb[-1][0] - vb[0][0], vb[-1][1] - vb[0][1]))), 1)
         f["n_vb"] = len(vb)
         f["th12_seen"] = int("th12" not in absent)
         f["crests_seen"] = int("crest_l" not in absent) + int("crest_r" not in absent)
-        f["n_artifact"] = len(a.get("boxes", []))
+        f["artifact"] = str(len(a.get("boxes", []))) if a.get("boxes") else ("нет" if "artifact" in absent else "?")
     else:
         one = lambda k: P[k][0] if P[k] else None
         gt, gl, lt, isch = one("gt_top"), one("gt_lat"), one("lt_tip"), one("ischium")
@@ -75,7 +76,7 @@ def features(a: dict, img: np.ndarray) -> dict:
         f["ischium"] = "не видно" if "ischium" in absent else ("обрезана" if isch and near_mask(img, *isch) else "видна")
         st, sb = one("shaft_top"), one("shaft_bot")
         if st and sb: f["shaft_deg"] = round(abs(math.degrees(math.atan2(sb[0] - st[0], sb[1] - st[1]))), 1)
-        f["n_artifact"] = len(a.get("boxes", []))
+        f["artifact"] = str(len(a.get("boxes", []))) if a.get("boxes") else ("нет" if "artifact" in absent else "?")
     return f
 
 
@@ -99,10 +100,10 @@ def main() -> int:
         rows.append((a, features(a, img), man[a["image_id"]]))
 
     print("\n=== ПОЗВОНОЧНИК: признаки по точкам ↔ метки экспертов")
-    print(f"{'снимок':11}{'кто':11}{'ось°':>6}{'Th12':>6}{'гребни':>8}{'рамок':>7}   эксперт: укладка ось предметы   комментарий")
+    print(f"{'снимок':11}{'кто':11}{'ось°':>6}{'Th12':>6}{'уровни':>13}{'гребни':>8}{'предметы':>10}   эксперт: укладка ось предметы   комментарий")
     for a, f, m in rows:
         if a["kind"] != "spine": continue
-        print(f"{a['image_id']:11}{a['annotator'][:10]:11}{f.get('axis_deg', ''):>6}{f['th12_seen']:>6}{f['crests_seen']:>8}{f['n_artifact']:>7}"
+        print(f"{a['image_id']:11}{a['annotator'][:10]:11}{f.get('axis_deg', ''):>6}{f['th12_seen']:>6}{f.get('levels', ''):>13}{f['crests_seen']:>8}{f['artifact']:>10}"
               f"            {m['spine_positioning'] or '-':>5} {m['spine_axis_tilt'] or '-':>5} {m['spine_artifact'] or '-':>6}      {m['comment']}")
     print("\n=== БЕДРО: признаки по точкам ↔ метки экспертов")
     print(f"{'снимок':11}{'кто':11}{'сверху':>7}{'сбоку':>7}{'снизу':>7}  {'малый вертел':14}{'выст.мм':>8}  {'седалищная':11}{'диафиз°':>8}   эксперт: укладка поле   комментарий")
@@ -118,10 +119,11 @@ def main() -> int:
         if len(lst) < 2: continue
         a, b = lst[0], lst[1]
         mm = MM.get(int(man[iid]["cols"]), 0.6)
-        pa = {p["label"]: (p["x"], p["y"]) for p in a["points"] if p["label"] != "vb"}
-        pb = {p["label"]: (p["x"], p["y"]) for p in b["points"] if p["label"] != "vb"}
+        pa = {p["label"]: (p["x"], p["y"]) for p in a["points"] if p["label"] != "vb" and not p["label"].startswith("L")}
+        pb = {p["label"]: (p["x"], p["y"]) for p in b["points"] if p["label"] != "vb" and not p["label"].startswith("L")}
         d = {k: round(math.hypot(pa[k][0] - pb[k][0], pa[k][1] - pb[k][1]) * mm, 1) for k in pa if k in pb}
-        va, vbb = sorted([(p["x"], p["y"]) for p in a["points"] if p["label"] == "vb"], key=lambda t: t[1]), sorted([(p["x"], p["y"]) for p in b["points"] if p["label"] == "vb"], key=lambda t: t[1])
+        isv = lambda p: p["label"] == "vb" or p["label"] in ("L1", "L2", "L3", "L4", "L5")
+        va, vbb = sorted([(p["x"], p["y"]) for p in a["points"] if isv(p)], key=lambda t: t[1]), sorted([(p["x"], p["y"]) for p in b["points"] if isv(p)], key=lambda t: t[1])
         if va and len(va) == len(vbb): d["vb(средн.)"] = round(float(np.mean([math.hypot(x[0] - y[0], x[1] - y[1]) for x, y in zip(va, vbb)])) * mm, 1)
         dis = sorted(set(a.get("absent", [])) ^ set(b.get("absent", [])))
         print(f"{iid}  {a['annotator']} ↔ {b['annotator']}: расхождение, мм: {d}" + (f"  | РАЗНЫЙ ответ «не видно»: {dis}" if dis else ""))

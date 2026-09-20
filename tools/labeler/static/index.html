@@ -179,15 +179,36 @@
 const COLORS = ['#E8930B','#3E6BE8','#0FA98B','#FF7A59','#9B5DE5','#00A6B8','#E0457B','#6BAF1F','#C77700','#5B7CFA','#2B2330','#D62828'];
 const SCHEMA = {
   spine: [
-    {key:'vb', name:'Центры тел позвонков', multi:true, min:3, autoNext:5,
-     where:'Геометрический центр <b>тела</b> позвонка — пересечение диагоналей четырёхугольника между верхней и нижней замыкательными пластинками и боковыми контурами. Отмечаем каждый позвонок, тело которого видно <b>целиком</b>, сверху вниз (обычно L1–L4, часто и L5). После 5-й точки программа сама перейдёт к Th12; позвонков меньше — нажмите «Дальше →», больше — вернитесь к этой строке и добавьте.',
-     err:'Не остистый отросток, не дужка и не диск. При сколиозе — по фактическому положению тел. Жёлтая линия должна идти по позвоночнику.',
-     why:'Ось позвоночника — прямая через центры тел; её угол к вертикали кадра. Норма — до 5°.'},
     {key:'th12', name:'Th12 — видимая часть тела', optional:true,
      where:'Th12 — самый нижний позвонок, от которого отходят рёбра. Точка — в центре <b>видимой в кадре части</b> его тела, даже если тело видно частично.',
      abs:'Тело Th12 в кадр не попало совсем.',
      err:'Не путать с L1: у L1 рёбер нет, видны поперечные отростки.',
      why:'Укладка: верхняя граница сканирования проходит примерно через середину тела Th12.'},
+    {key:'L1', name:'L1 — центр тела', optional:true, vert:true,
+     where:'Геометрический центр <b>тела L1</b> — пересечение диагоналей четырёхугольника между верхней и нижней замыкательными пластинками и боковыми контурами. Считаем сверху: L1 — первый позвонок <b>без рёбер</b>, сразу под Th12.',
+     abs:'Тело L1 не видно целиком: срезано краем кадра или закрыто.',
+     err:'Не остистый отросток, не дужка и не диск. При сколиозе — по фактическому положению тела. Жёлтая линия должна идти по позвоночнику.',
+     why:'Ось позвоночника — прямая через центры тел, её угол к вертикали кадра (норма до 5°). Какие уровни попали в кадр — признак правильной укладки.'},
+    {key:'L2', name:'L2 — центр тела', optional:true, vert:true,
+     where:'Геометрический центр <b>тела L2</b> — пересечение диагоналей четырёхугольника между верхней и нижней замыкательными пластинками и боковыми контурами. Второй поясничный.',
+     abs:'Тело L2 не видно целиком: срезано краем кадра или закрыто.',
+     err:'Не остистый отросток, не дужка и не диск. При сколиозе — по фактическому положению тела. Жёлтая линия должна идти по позвоночнику.',
+     why:'Ось позвоночника — прямая через центры тел, её угол к вертикали кадра (норма до 5°). Какие уровни попали в кадр — признак правильной укладки.'},
+    {key:'L3', name:'L3 — центр тела', optional:true, vert:true,
+     where:'Геометрический центр <b>тела L3</b> — пересечение диагоналей четырёхугольника между верхней и нижней замыкательными пластинками и боковыми контурами. Третий поясничный.',
+     abs:'Тело L3 не видно целиком: срезано краем кадра или закрыто.',
+     err:'Не остистый отросток, не дужка и не диск. При сколиозе — по фактическому положению тела. Жёлтая линия должна идти по позвоночнику.',
+     why:'Ось позвоночника — прямая через центры тел, её угол к вертикали кадра (норма до 5°). Какие уровни попали в кадр — признак правильной укладки.'},
+    {key:'L4', name:'L4 — центр тела', optional:true, vert:true,
+     where:'Геометрический центр <b>тела L4</b> — пересечение диагоналей четырёхугольника между верхней и нижней замыкательными пластинками и боковыми контурами. Четвёртый поясничный — обычно на уровне вершин гребней подвздошных костей.',
+     abs:'Тело L4 не видно целиком: срезано краем кадра или закрыто.',
+     err:'Не остистый отросток, не дужка и не диск. При сколиозе — по фактическому положению тела. Жёлтая линия должна идти по позвоночнику.',
+     why:'Ось позвоночника — прямая через центры тел, её угол к вертикали кадра (норма до 5°). Какие уровни попали в кадр — признак правильной укладки.'},
+    {key:'L5', name:'L5 — центр тела', optional:true, vert:true,
+     where:'Геометрический центр <b>тела L5</b> — пересечение диагоналей четырёхугольника между верхней и нижней замыкательными пластинками и боковыми контурами. Пятый поясничный, над крестцом. Часто срезан нижним краем кадра — тогда <b>«Не видно в кадре»</b>.',
+     abs:'Тело L5 не видно целиком: срезано краем кадра или закрыто.',
+     err:'Не остистый отросток, не дужка и не диск. При сколиозе — по фактическому положению тела. Жёлтая линия должна идти по позвоночнику.',
+     why:'Ось позвоночника — прямая через центры тел, её угол к вертикали кадра (норма до 5°). Какие уровни попали в кадр — признак правильной укладки.'},
     {key:'crest_l', name:'Гребень подвздошной — слева', title:'Гребень подвздошной кости — слева', optional:true,
      where:'Самая высокая (краниальная) точка контура гребня подвздошной кости в <b>левой части экрана</b>. Гребни — тонкая кость, на карте плотности они очень тёмные, поэтому на этом шаге <b>тени поднимаются сами</b> (кнопка «Тени+», клавиша T). Вершина неясна или срезана краем — ставим самую высокую видимую точку и галочку «видно нечётко».',
      abs:'Гребня нет в кадре <b>даже с «Тени+»</b>.',
@@ -259,7 +280,7 @@ const SCHEMA = {
   ],
 };
 // положение ориентиров на схемах (viewBox 0 0 200 210); бедро нарисовано как ПРАВОЕ (таз справа), левое — зеркально
-const POS = { vb:[[100,36],[100,68],[100,100],[100,132],[100,165]], th12:[[100,7]], crest_l:[[36,163]], crest_r:[[164,163]], artifact:[[150,44]],
+const POS = { L1:[[100,36]], L2:[[100,68]], L3:[[100,100]], L4:[[100,132]], L5:[[100,165]], th12:[[100,7]], crest_l:[[36,163]], crest_r:[[164,163]], artifact:[[150,44]],
   head:[[138,68]], gt_top:[[68,72]], gt_lat:[[50,97]], neck_sup:[[101,76]], neck_inf:[[119,106]], lt_tip:[[114,141]], lt_up:[[102,126]], lt_down:[[100,154]], ischium:[[161,173]], shaft_top:[[80,165]], shaft_bot:[[80,204]] };
 const SVG_SPINE = `
   <path d="M0,192 C18,160 52,156 72,180 L72,210 L0,210Z M200,192 C182,160 148,156 128,180 L128,210 L200,210Z" fill="#FFE9DC" stroke="#2B2330" stroke-width="2.5"/>
@@ -293,6 +314,7 @@ function applyLUT() {                      // тени (гамма) + контр
   proc.getContext('2d').putImageData(out, 0, 0);
 }
 function retone() { clearTimeout(lutTimer); lutTimer = setTimeout(() => { applyLUT(); if (cur) draw(); }, 15); }
+let migrated = false;
 let cur = null, img = new Image(), scale = 3, active = 0, st = null, drag = null, boxStart = null, history = [], t0 = 0, saveTimer = null, dirty = false, WHO = localStorage.getItem('dxa_who') || '';
 
 function blank() { return {points:[], boxes:[], absent:[], fuzzy:[], unsure:false, comment:''}; }
@@ -333,7 +355,11 @@ function setImage(res) {
   if (!res.image) { cur = null; $('frame').hidden = true; $('empty').hidden = false; $('empty').innerHTML = '<h2>Очередь пуста</h2><p>Все снимки размечены. Спасибо за работу!</p>'; $('labels').innerHTML = ''; return; }
   cur = res.image; const a = res.annotation;
   st = a ? {points:a.points || [], boxes:a.boxes || [], absent:a.absent || [], fuzzy:a.fuzzy || [], unsure:!!a.unsure, comment:a.comment || ''} : blank();
-  history = []; dirty = false; t0 = Date.now(); say('');
+  if (cur.kind === 'spine' && st.points.some(p => p.label === 'vb')) {            // разметка старого образца: точки без уровней
+    const v = st.points.filter(p => p.label === 'vb').sort((a, b) => a.y - b.y).slice(0, 5); st.points = st.points.filter(p => p.label !== 'vb');
+    v.forEach((p, i) => st.points.push({label: 'L' + (i + 1), x: p.x, y: p.y})); migrated = true;
+  } else migrated = false;
+  history = []; dirty = false; t0 = Date.now(); say(migrated ? 'Старая разметка: уровни позвонков расставлены по порядку сверху — проверьте, что L1 это действительно L1' : '', migrated ? 'bad' : '');
   $('unsure').checked = st.unsure; $('comment').value = st.comment;
   $('imgtitle').textContent = `${cur.id} · ${cur.kind === 'spine' ? 'позвоночник' : 'бедро'}${cur.stage === 'overlap' ? ' · общий для всех' : ''}`;
   img = new Image();
@@ -400,7 +426,7 @@ function draw() {
   ctx.drawImage(proc, 0, 0, cv.width, cv.height);
   const sc = schema(), S = scale * dpr, P = (k) => pts(k)[0];
   const line = (a, b, col, dash) => { if (!a || !b) return; ctx.beginPath(); ctx.setLineDash(dash || []); ctx.moveTo(a.x * S, a.y * S); ctx.lineTo(b.x * S, b.y * S); ctx.strokeStyle = col; ctx.lineWidth = 2 * dpr; ctx.stroke(); ctx.setLineDash([]); };
-  if (cur.kind === 'spine') { const v = pts('vb').slice().sort((a, b) => a.y - b.y); for (let i = 1; i < v.length; i++) line(v[i - 1], v[i], '#FFD24D'); }
+  if (cur.kind === 'spine') { const v = st.points.filter(p => /^L[1-5]$/.test(p.label) || p.label === 'vb').sort((a, b) => a.y - b.y); for (let i = 1; i < v.length; i++) line(v[i - 1], v[i], '#FFD24D'); }
   else { line(P('neck_sup'), P('neck_inf'), '#FF7A59'); line(P('shaft_top'), P('shaft_bot'), '#FFFFFF', [6, 5]); line(P('lt_up'), P('lt_tip'), '#35D0BA'); line(P('lt_tip'), P('lt_down'), '#35D0BA'); line(P('lt_up'), P('lt_down'), '#35D0BA', [3, 3]); }
   st.boxes.forEach(b => { ctx.strokeStyle = '#FF5A5A'; ctx.lineWidth = 2.5 * dpr; ctx.strokeRect(b.x1 * S, b.y1 * S, (b.x2 - b.x1) * S, (b.y2 - b.y1) * S); });
   if (boxStart && boxStart.cur) { ctx.strokeStyle = '#FF5A5A'; ctx.lineWidth = 2 * dpr; ctx.setLineDash([5 * dpr, 4 * dpr]); ctx.strokeRect(boxStart.x * S, boxStart.y * S, (boxStart.cur.x - boxStart.x) * S, (boxStart.cur.y - boxStart.y) * S); ctx.setLineDash([]); }
@@ -431,7 +457,7 @@ cv.addEventListener('mousedown', e => { if (e.button !== 0 || !cur) return; cons
   if (l.box) { boxStart = {x: p.x, y: p.y, cur: null}; return; }
   snap(); st.absent = st.absent.filter(k => k !== l.key);
   const pt = {label: l.key, x: +p.x.toFixed(2), y: +p.y.toFixed(2)};
-  if (l.multi) { st.points.push(pt); if (l.autoNext && pts(l.key).length >= l.autoNext) { const n = schema().findIndex((x, i) => i > active && !complete(x)); active = n >= 0 ? n : firstPending(); } }
+  if (l.multi) { st.points.push(pt); }
   else { st.points = st.points.filter(o => o.label !== l.key); st.points.push(pt); const n = schema().findIndex((x, i) => i > active && !complete(x)); active = n >= 0 ? n : firstPending(); }
   changed(); });
 cv.addEventListener('mouseleave', () => { mouse = null; if (cur) draw(); });
@@ -454,7 +480,8 @@ async function save(done) {
   try { const r = await api('api/save', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)}); showState(r.state); dirty = false; if (!done) say('сохранено ✓', 'ok'); return true; }
   catch (e) { say('не сохранилось: ' + e.message, 'bad'); return false; }
 }
-async function finish() { if (!cur) return; if (!allDone()) { say('Остались неотмеченные ориентиры: поставьте точку или «Не видно в кадре»', 'bad'); return; } clearTimeout(saveTimer); if (await save(true)) next(); }
+async function finish() { if (!cur) return; if (cur.kind === 'spine' && allDone() && st.points.filter(p => /^L[1-5]$/.test(p.label)).length < 2) { say('Отмечено меньше двух тел позвонков — ось не построить. Проверьте уровни или поставьте «сомневаюсь» и напишите комментарий', 'bad'); if (!$('unsure').checked) return; }
+  if (!allDone()) { say('Остались неотмеченные ориентиры: поставьте точку или «Не видно в кадре»', 'bad'); return; } clearTimeout(saveTimer); if (await save(true)) next(); }
 async function skip() { if (!cur) return; clearTimeout(saveTimer); if (dirty) await save(false);
   await api('api/release', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({annotator: WHO, image_id: cur.id})}).catch(() => {}); next(); }
 
