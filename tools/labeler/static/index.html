@@ -46,10 +46,11 @@
   .g-row dt { font-weight:900; color:var(--ink-2); font-size:12px; text-transform:uppercase; letter-spacing:.05em; padding-top:2px; }
   .g-row dd { margin:0; font-weight:600; color:var(--ink); }
   .rules { font-size:13.5px; font-weight:600; color:var(--ink-2); margin:0; padding-left:18px; } .rules li { margin:5px 0; }
-  #stage { display:flex; align-items:flex-start; justify-content:center; min-height:0; overflow:auto; }
-  #frame { border:3px solid var(--ink); border-radius:12px; padding:6px; box-shadow:var(--hs); background:#000; line-height:0; }
-  .seg { display:inline-flex; border:2.5px solid var(--ink); border-radius:999px; overflow:hidden; } .seg button { font:inherit; font-weight:800; font-size:13px; padding:5px 12px; border:0; background:#fff; color:var(--ink); cursor:pointer; } .seg button.on { background:var(--ink); color:#fff; }
+  #stage { display:flex; align-items:flex-start; justify-content:center; min-height:0; overflow:auto; padding-top:22px; }
+  #frame { position:relative; border:3px solid var(--ink); border-radius:12px; padding:6px; box-shadow:var(--hs); background:#000; line-height:0; }
+  .seg { display:inline-flex; border:2.5px solid var(--ink); border-radius:999px; overflow:hidden; } .seg button { font:inherit; font-weight:800; font-size:13px; padding:5px 12px; border:0; background:#fff; color:var(--ink); cursor:pointer; } .seg button.on { background:var(--ink); color:#fff; } #shadows.on, #loupeBtn.on { background:var(--ink); color:#fff; }
   canvas { cursor:crosshair; display:block; }
+  #now { position:absolute; top:-19px; right:14px; display:flex; align-items:center; gap:8px; background:var(--lemon); border:2.5px solid var(--ink); border-radius:999px; padding:4px 14px; font-weight:800; font-size:14px; line-height:1.35; white-space:nowrap; box-shadow:3px 3px 0 rgba(43,35,48,.14); pointer-events:none; z-index:2; }
   #empty { margin:60px auto; text-align:center; max-width:460px; }
   #empty h2 { font-size:26px; margin-bottom:10px; } #empty p { color:var(--muted); font-weight:600; }
   .lbl { display:flex; align-items:center; gap:8px; padding:3px 9px; border:2px solid transparent; border-radius:12px; cursor:pointer; font-weight:700; font-size:13.5px; line-height:1.35; white-space:nowrap; }
@@ -117,7 +118,7 @@
 
   <section id="stage">
     <div id="empty"><h2>Загружаем…</h2><p></p></div>
-    <div id="frame" hidden><canvas id="cv"></canvas></div>
+    <div id="frame" hidden><div id="now"></div><canvas id="cv"></canvas></div>
   </section>
 
   <div class="col right">
@@ -132,8 +133,8 @@
       </div>
     </section>
     <section class="card fixed">
-      <div class="row" style="gap:8px"><label title="Яркость">☀︎</label><input type="range" id="br" min="60" max="260" value="100"><label title="Контраст">◐</label><input type="range" id="ct" min="60" max="260" value="100"><label style="margin-left:auto"><input type="checkbox" id="unsure"> сомневаюсь</label></div>
-      <div class="row" style="gap:8px"><span class="seg" title="Как показывать снимок (клавиша C)"><button id="v-contrast">Контраст+</button><button id="v-sharp">Чёткий</button></span><label title="Увеличение под курсором (клавиша L)"><input type="checkbox" id="loupe" checked> лупа</label></div>
+      <div class="row" style="gap:8px"><label title="Тени: вправо — светлее тёмные участки (гребни, мягкие ткани)">тени</label><input type="range" id="br" min="0" max="100" value="0"><label title="Контраст">◐</label><input type="range" id="ct" min="60" max="220" value="100"><label style="margin-left:auto"><input type="checkbox" id="unsure"> сомневаюсь</label></div>
+      <div class="row" style="gap:8px"><span class="seg" title="Как показывать снимок (клавиша C)"><button id="v-contrast">Контраст+</button><button id="v-sharp">Чёткий</button></span><input type="checkbox" id="loupe" hidden><button class="btn btn-ghost" id="loupeBtn" title="Увеличение под курсором — включить/выключить (клавиша L)" style="padding:5px 12px;font-size:13px;box-shadow:none">Лупа</button><button class="btn btn-ghost" id="shadows" title="Резко поднять тени — чтобы увидеть гребни подвздошных костей (клавиша T)" style="padding:5px 12px;font-size:13px;box-shadow:none;margin-left:auto">Тени+</button></div>
       <div class="row"><textarea id="comment" placeholder="Комментарий (необязательно): эндопротез, сколиоз, плохо видно…"></textarea></div>
       <div class="row">
         <button class="btn btn-primary" id="done" title="Снимок размечен (Enter)">Готово → следующий</button>
@@ -162,13 +163,14 @@
   <h3>Общие правила</h3>
   <ul>
     <li>Ставим точку туда, где структура <b>реально видна</b>; ушедшее за край кадра не достраиваем.</li>
+    <li>Гребни подвздошных костей и края седалищной кости на этих снимках очень тёмные. Прежде чем отвечать «не видно», нажмите <b>«Тени+»</b>.</li>
     <li><b>«Не видно в кадре»</b> — полноценный ответ: по нему программа узнаёт, что Th12 не попал в кадр или малый вертел не контурируется.</li>
     <li>Чёрные прямоугольники по краям — маски лаборанта, под ними ничего не размечаем.</li>
     <li>Сколиоз, перелом, эндопротез — размечаем по фактической анатомии и пишем об этом в комментарии. Оценивать качество снимка не нужно.</li>
     <li>Сомневаетесь — поставьте галочку «сомневаюсь»: снимок посмотрит ещё кто-то.</li>
   </ul>
   <h3>Клавиши</h3>
-  <p><kbd>1</kbd>…<kbd>0</kbd> выбрать ориентир · <kbd>Пробел</kbd> следующий · <kbd>N</kbd> не видно · <kbd>⌘Z</kbd> / <kbd>Ctrl+Z</kbd> отменить · <kbd>Enter</kbd> готово · <kbd>S</kbd> пропустить снимок · <kbd>C</kbd> вид «контраст+ / чёткий» · <kbd>L</kbd> лупа. Всё то же доступно кнопками.</p>
+  <p><kbd>1</kbd>…<kbd>0</kbd> выбрать ориентир · <kbd>Пробел</kbd> следующий · <kbd>N</kbd> не видно · <kbd>⌘Z</kbd> / <kbd>Ctrl+Z</kbd> отменить · <kbd>Enter</kbd> готово · <kbd>S</kbd> пропустить снимок · <kbd>C</kbd> вид «контраст+ / чёткий» · <kbd>L</kbd> лупа · <kbd>T</kbd> «Тени+» (проявить гребни). Всё то же доступно кнопками.</p>
   <p>Точное определение каждого ориентира со схемой всегда показано в левой колонке — для той точки, которую вы ставите сейчас.</p>
   <div class="row" style="margin-top:18px"><button class="btn btn-primary btn-lg" id="dlgok">Понятно, начать</button></div>
 </dialog>
@@ -177,8 +179,8 @@
 const COLORS = ['#E8930B','#3E6BE8','#0FA98B','#FF7A59','#9B5DE5','#00A6B8','#E0457B','#6BAF1F','#C77700','#5B7CFA','#2B2330','#D62828'];
 const SCHEMA = {
   spine: [
-    {key:'vb', name:'Центры тел позвонков', multi:true, min:3,
-     where:'Геометрический центр <b>тела</b> позвонка — пересечение диагоналей четырёхугольника между верхней и нижней замыкательными пластинками и боковыми контурами. Отмечаем каждый позвонок, тело которого видно <b>целиком</b>, сверху вниз (обычно L1–L4, часто и L5). Закончили — «Дальше →».',
+    {key:'vb', name:'Центры тел позвонков', multi:true, min:3, autoNext:5,
+     where:'Геометрический центр <b>тела</b> позвонка — пересечение диагоналей четырёхугольника между верхней и нижней замыкательными пластинками и боковыми контурами. Отмечаем каждый позвонок, тело которого видно <b>целиком</b>, сверху вниз (обычно L1–L4, часто и L5). После 5-й точки программа сама перейдёт к Th12; позвонков меньше — нажмите «Дальше →», больше — вернитесь к этой строке и добавьте.',
      err:'Не остистый отросток, не дужка и не диск. При сколиозе — по фактическому положению тел. Жёлтая линия должна идти по позвоночнику.',
      why:'Ось позвоночника — прямая через центры тел; её угол к вертикали кадра. Норма — до 5°.'},
     {key:'th12', name:'Th12 — видимая часть тела', optional:true,
@@ -187,13 +189,13 @@ const SCHEMA = {
      err:'Не путать с L1: у L1 рёбер нет, видны поперечные отростки.',
      why:'Укладка: верхняя граница сканирования проходит примерно через середину тела Th12.'},
     {key:'crest_l', name:'Гребень подвздошной — слева', title:'Гребень подвздошной кости — слева', optional:true,
-     where:'Самая высокая (краниальная) точка контура гребня подвздошной кости в <b>левой части экрана</b>.',
-     abs:'Гребень в кадр не попал.',
+     where:'Самая высокая (краниальная) точка контура гребня подвздошной кости в <b>левой части экрана</b>. Гребни на этих снимках очень тёмные — <b>нажмите «Тени+»</b> (клавиша T), они проявятся в нижних углах.',
+     abs:'Гребня нет в кадре <b>даже с «Тени+»</b>.',
      err:'Не поперечный отросток L5 и не газ в кишке. Видна только часть крыла — ставим самую высокую видимую точку и отмечаем «сомневаюсь».',
      why:'Укладка: снизу должны быть видны верхние края обеих подвздошных костей.'},
     {key:'crest_r', name:'Гребень подвздошной — справа', title:'Гребень подвздошной кости — справа', optional:true,
-     where:'Самая высокая (краниальная) точка контура гребня подвздошной кости в <b>правой части экрана</b>.',
-     abs:'Гребень в кадр не попал.',
+     where:'Самая высокая (краниальная) точка контура гребня подвздошной кости в <b>правой части экрана</b>. Гребни на этих снимках очень тёмные — <b>нажмите «Тени+»</b> (клавиша T), они проявятся в нижних углах.',
+     abs:'Гребня нет в кадре <b>даже с «Тени+»</b>.',
      err:'Не поперечный отросток L5 и не газ в кишке. Видна только часть крыла — ставим самую высокую видимую точку и отмечаем «сомневаюсь».',
      why:'Укладка: снизу должны быть видны верхние края обеих подвздошных костей.'},
     {key:'artifact', name:'Посторонний предмет — рамка', box:true, multi:true, free:true,
@@ -276,6 +278,21 @@ const SVG_HIP = `
 const $ = (id) => document.getElementById(id);
 const cv = $('cv'), ctx = cv.getContext('2d');
 let VIEW = localStorage.getItem('dxa_view') || 'contrast', mouse = null, dpr = 1;
+const proc = document.createElement('canvas'), raw = document.createElement('canvas'); let rawData = null, lutTimer = null;
+function loadRaw() {                       // исходные пиксели снимка — один раз на загрузку
+  raw.width = proc.width = img.naturalWidth; raw.height = proc.height = img.naturalHeight;
+  const r = raw.getContext('2d', {willReadFrequently: true}); r.drawImage(img, 0, 0); rawData = r.getImageData(0, 0, raw.width, raw.height); applyLUT();
+}
+function applyLUT() {                      // тени (гамма) + контраст — своей таблицей, без фильтров браузера
+  if (!rawData) return;
+  const gamma = 1 - 0.7 * (+$('br').value / 100), c = +$('ct').value / 100, lut = new Uint8ClampedArray(256);
+  const bp = 8 + 10 * (+$('br').value / 100);                        // точка чёрного: фон и маски остаются чёрными
+  for (let v = 0; v < 256; v++) lut[v] = (Math.pow(Math.max(0, v - bp) / (255 - bp), gamma) * 255 - 128) * c + 128;
+  const out = new ImageData(new Uint8ClampedArray(rawData.data), rawData.width, rawData.height), d = out.data;
+  for (let i = 0; i < d.length; i += 4) { d[i] = lut[d[i]]; d[i + 1] = lut[d[i + 1]]; d[i + 2] = lut[d[i + 2]]; }
+  proc.getContext('2d').putImageData(out, 0, 0);
+}
+function retone() { clearTimeout(lutTimer); lutTimer = setTimeout(() => { applyLUT(); if (cur) draw(); }, 15); }
 let cur = null, img = new Image(), scale = 3, active = 0, st = null, drag = null, boxStart = null, history = [], t0 = 0, saveTimer = null, dirty = false, WHO = localStorage.getItem('dxa_who') || '';
 
 function blank() { return {points:[], boxes:[], absent:[], fuzzy:[], unsure:false, comment:''}; }
@@ -320,13 +337,13 @@ function setImage(res) {
   $('unsure').checked = st.unsure; $('comment').value = st.comment;
   $('imgtitle').textContent = `${cur.id} · ${cur.kind === 'spine' ? 'позвоночник' : 'бедро'}${cur.stage === 'overlap' ? ' · общий для всех' : ''}`;
   img = new Image();
-  img.onload = () => { $('empty').hidden = true; $('frame').hidden = false; fit(); active = firstPending(); render(); };
+  img.onload = () => { $('empty').hidden = true; $('frame').hidden = false; $('br').value = cur.kind === 'spine' ? 35 : 0; $('shadows').classList.remove('on'); loadRaw(); fit(); active = firstPending(); render(); };
   img.onerror = () => { if (!img.src.endsWith('.png')) img.src = 'img/' + cur.id + '.png'; };
   img.src = 'imgv/' + VIEW + '/' + cur.id + '.jpg';
 }
 function fit() {
   const box = $('stage').getBoundingClientRect();
-  scale = Math.max(1.4, Math.min(4, (box.height - 32) / cur.h, (box.width - 36) / cur.w));
+  scale = Math.max(1.4, Math.min(4, (box.height - 56) / cur.h, (box.width - 36) / cur.w));
   dpr = window.devicePixelRatio || 1;
   const cw = Math.round(cur.w * scale), ch = Math.round(cur.h * scale);
   cv.style.width = cw + 'px'; cv.style.height = ch + 'px'; cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
@@ -369,14 +386,15 @@ function render() {
   document.querySelectorAll('.lbl').forEach(el => el.onclick = () => { active = +el.dataset.i; render(); });
   const act = document.querySelector('.lbl.active'); if (act) act.scrollIntoView({block:'nearest'});
   const l = sc[active]; guide(l, active);
+  { const n = l.box ? st.boxes.length : pts(l.key).length; $('now').innerHTML = `<span class="dot" style="background:${COLORS[active]}"></span>${allDone() && l.free ? 'Всё отмечено — жмите «Готово» (или обведите посторонний предмет)' : 'Ставим: ' + (l.title || l.name) + (l.multi ? ' · ' + n : '')}`; }
   $('fuzzy').checked = st.fuzzy.includes(l.key); $('fuzzy').disabled = !!l.box || !pts(l.key).length;
   $('absent').disabled = !l.optional; $('nextlbl').disabled = !(l.multi || l.box);
   $('done').disabled = !allDone();
   draw();
 }
 function draw() {
-  ctx.save(); ctx.filter = `brightness(${$('br').value}%) contrast(${$('ct').value}%)`; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, 0, 0, cv.width, cv.height); ctx.restore();
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(proc, 0, 0, cv.width, cv.height);
   const sc = schema(), S = scale * dpr, P = (k) => pts(k)[0];
   const line = (a, b, col, dash) => { if (!a || !b) return; ctx.beginPath(); ctx.setLineDash(dash || []); ctx.moveTo(a.x * S, a.y * S); ctx.lineTo(b.x * S, b.y * S); ctx.strokeStyle = col; ctx.lineWidth = 2 * dpr; ctx.stroke(); ctx.setLineDash([]); };
   if (cur.kind === 'spine') { const v = pts('vb').slice().sort((a, b) => a.y - b.y); for (let i = 1; i < v.length; i++) line(v[i - 1], v[i], '#FFD24D'); }
@@ -385,14 +403,13 @@ function draw() {
   if (boxStart && boxStart.cur) { ctx.strokeStyle = '#FF5A5A'; ctx.lineWidth = 2 * dpr; ctx.setLineDash([5 * dpr, 4 * dpr]); ctx.strokeRect(boxStart.x * S, boxStart.y * S, (boxStart.cur.x - boxStart.x) * S, (boxStart.cur.y - boxStart.y) * S); ctx.setLineDash([]); }
   st.points.forEach(p => { const i = sc.findIndex(l => l.key === p.label); ctx.beginPath(); ctx.arc(p.x * S, p.y * S, 5.5 * dpr, 0, 7); ctx.fillStyle = COLORS[i]; ctx.fill(); ctx.lineWidth = 2 * dpr; ctx.strokeStyle = '#fff'; ctx.stroke(); });
   if ($('loupe').checked && mouse && !drag && !boxStart) {                       // лупа: участок под курсором в 2,4 раза крупнее
-    const R = 78 * dpr, Z = 2.4, kx = img.naturalWidth / cur.w, ky = img.naturalHeight / cur.h;
+    const R = 78 * dpr, Z = 2.4, kx = proc.width / cur.w, ky = proc.height / cur.h;
     const half = (R / S) / Z, cx = mouse.x * S, cy = mouse.y * S;
     let lx = cx + 96 * dpr, ly = cy - 96 * dpr;
     if (lx + R > cv.width) lx = cx - 96 * dpr; if (ly - R < 0) ly = cy + 96 * dpr;
     ctx.save(); ctx.beginPath(); ctx.arc(lx, ly, R, 0, 7); ctx.clip();
-    ctx.filter = `brightness(${$('br').value}%) contrast(${$('ct').value}%)`; ctx.fillStyle = '#000'; ctx.fillRect(lx - R, ly - R, 2 * R, 2 * R);
-    ctx.drawImage(img, (mouse.x - half) * kx, (mouse.y - half) * ky, 2 * half * kx, 2 * half * ky, lx - R, ly - R, 2 * R, 2 * R);
-    ctx.filter = 'none';
+    ctx.fillStyle = '#000'; ctx.fillRect(lx - R, ly - R, 2 * R, 2 * R);
+    ctx.drawImage(proc, (mouse.x - half) * kx, (mouse.y - half) * ky, 2 * half * kx, 2 * half * ky, lx - R, ly - R, 2 * R, 2 * R);
     st.points.forEach(p => { const dx = (p.x - mouse.x) * S * Z, dy = (p.y - mouse.y) * S * Z; if (Math.hypot(dx, dy) < R) { const i = sc.findIndex(l => l.key === p.label); ctx.beginPath(); ctx.arc(lx + dx, ly + dy, 4 * dpr, 0, 7); ctx.fillStyle = COLORS[i]; ctx.fill(); ctx.lineWidth = 1.5 * dpr; ctx.strokeStyle = '#fff'; ctx.stroke(); } });
     ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1 * dpr; ctx.beginPath(); ctx.moveTo(lx - 12 * dpr, ly); ctx.lineTo(lx - 3 * dpr, ly); ctx.moveTo(lx + 3 * dpr, ly); ctx.lineTo(lx + 12 * dpr, ly); ctx.moveTo(lx, ly - 12 * dpr); ctx.lineTo(lx, ly - 3 * dpr); ctx.moveTo(lx, ly + 3 * dpr); ctx.lineTo(lx, ly + 12 * dpr); ctx.stroke();
     ctx.restore(); ctx.beginPath(); ctx.arc(lx, ly, R, 0, 7); ctx.lineWidth = 3 * dpr; ctx.strokeStyle = '#FFF9F2'; ctx.stroke();
@@ -411,7 +428,7 @@ cv.addEventListener('mousedown', e => { if (e.button !== 0 || !cur) return; cons
   if (l.box) { boxStart = {x: p.x, y: p.y, cur: null}; return; }
   snap(); st.absent = st.absent.filter(k => k !== l.key);
   const pt = {label: l.key, x: +p.x.toFixed(2), y: +p.y.toFixed(2)};
-  if (l.multi) st.points.push(pt);
+  if (l.multi) { st.points.push(pt); if (l.autoNext && pts(l.key).length >= l.autoNext) { const n = schema().findIndex((x, i) => i > active && !complete(x)); active = n >= 0 ? n : firstPending(); } }
   else { st.points = st.points.filter(o => o.label !== l.key); st.points.push(pt); const n = schema().findIndex((x, i) => i > active && !complete(x)); active = n >= 0 ? n : firstPending(); }
   changed(); });
 cv.addEventListener('mouseleave', () => { mouse = null; if (cur) draw(); });
@@ -440,9 +457,11 @@ async function skip() { if (!cur) return; clearTimeout(saveTimer); if (dirty) aw
 
 $('fuzzy').onchange = () => { const k = schema()[active].key; snap(); st.fuzzy = st.fuzzy.filter(x => x !== k); if ($('fuzzy').checked) st.fuzzy.push(k); changed(); };
 $('nextlbl').onclick = nextLabel; $('absent').onclick = markAbsent; $('undo').onclick = undo; $('done').onclick = finish; $('skip').onclick = skip;
-function setView(v) { VIEW = v; localStorage.setItem('dxa_view', v); $('v-contrast').classList.toggle('on', v === 'contrast'); $('v-sharp').classList.toggle('on', v === 'sharp'); if (cur) { const keep = img; img = new Image(); img.onload = () => draw(); img.onerror = () => { img = keep; }; img.src = 'imgv/' + v + '/' + cur.id + '.jpg'; } }
-$('v-contrast').onclick = () => setView('contrast'); $('v-sharp').onclick = () => setView('sharp'); $('loupe').onchange = () => { localStorage.setItem('dxa_loupe', $('loupe').checked ? '1' : '0'); draw(); };
-$('br').oninput = draw; $('ct').oninput = draw; $('unsure').onchange = changed;
+function setView(v) { VIEW = v; localStorage.setItem('dxa_view', v); $('v-contrast').classList.toggle('on', v === 'contrast'); $('v-sharp').classList.toggle('on', v === 'sharp'); if (cur) { const keep = img; img = new Image(); img.onload = () => { loadRaw(); draw(); }; img.onerror = () => { img = keep; }; img.src = 'imgv/' + v + '/' + cur.id + '.jpg'; } }
+$('v-contrast').onclick = () => setView('contrast'); $('v-sharp').onclick = () => setView('sharp'); $('loupe').onchange = () => { $('loupeBtn').classList.toggle('on', $('loupe').checked); if (cur) draw(); };
+$('loupeBtn').onclick = () => { $('loupe').checked = !$('loupe').checked; $('loupe').onchange(); };
+$('br').oninput = () => { $('shadows').classList.remove('on'); retone(); }; $('ct').oninput = retone;
+$('shadows').onclick = () => { const on = !$('shadows').classList.contains('on'); $('shadows').classList.toggle('on', on); $('br').value = on ? 95 : (cur && cur.kind === 'spine' ? 35 : 0); retone(); }; $('unsure').onchange = changed;
 $('comment').oninput = () => { dirty = true; clearTimeout(saveTimer); saveTimer = setTimeout(() => save(false), 900); };
 $('help').onclick = () => $('dlg').showModal(); $('dlgok').onclick = () => { $('dlg').close(); localStorage.setItem('dxa_help', '1'); };
 $('change').onclick = pickWho;
@@ -454,11 +473,12 @@ window.addEventListener('keydown', e => { if (['INPUT', 'TEXTAREA', 'SELECT'].in
   if ((e.metaKey || e.ctrlKey) && (k === 'z' || k === 'я')) { e.preventDefault(); undo(); return; }
   if (e.key === 'Enter') { e.preventDefault(); finish(); } else if (e.key === ' ') { e.preventDefault(); nextLabel(); }
   else if (k === 'c' || k === 'с') setView(VIEW === 'contrast' ? 'sharp' : 'contrast'); else if (k === 'l' || k === 'д') { $('loupe').checked = !$('loupe').checked; $('loupe').onchange(); }
+  else if (k === 't' || k === 'е') $('shadows').onclick();
   else if (k === 'n' || k === 'т') markAbsent(); else if (k === 's' || k === 'ы') skip();
   else if (/^[0-9]$/.test(e.key)) { const i = (+e.key + 9) % 10; if (i < schema().length) { active = i; render(); } } });
 window.addEventListener('beforeunload', () => { if (dirty) save(false); });
 
-$('loupe').checked = localStorage.getItem('dxa_loupe') !== '0'; $('v-contrast').classList.toggle('on', VIEW === 'contrast'); $('v-sharp').classList.toggle('on', VIEW === 'sharp');
+$('loupe').checked = false; $('v-contrast').classList.toggle('on', VIEW === 'contrast'); $('v-sharp').classList.toggle('on', VIEW === 'sharp');
 if (WHO) { setWho(WHO); next(); } else pickWho();
 </script>
 </body>
