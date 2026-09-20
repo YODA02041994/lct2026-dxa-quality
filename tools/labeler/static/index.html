@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Разметка DXA</title>
+<style>
+  :root { --bg:#0f1216; --panel:#171b21; --line:#2a313b; --text:#e6e9ee; --muted:#93a0b0; --acc:#4da3ff; --ok:#39c27d; --warn:#ffb648; --bad:#ff6b6b; }
+  * { box-sizing:border-box; }
+  body { margin:0; height:100vh; display:flex; flex-direction:column; background:var(--bg); color:var(--text); font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  header { display:flex; gap:16px; align-items:center; padding:10px 16px; border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap; }
+  header h1 { font-size:15px; margin:0; font-weight:600; }
+  input,select,textarea,button { font:inherit; color:var(--text); background:#0f1318; border:1px solid var(--line); border-radius:6px; padding:6px 9px; }
+  button { cursor:pointer; background:#1d2530; }
+  button:hover { border-color:#3b4656; }
+  button.primary { background:var(--acc); border-color:var(--acc); color:#06121f; font-weight:600; }
+  button.primary:disabled { opacity:.4; cursor:not-allowed; }
+  .stat { color:var(--muted); font-size:13px; } .stat b { color:var(--text); }
+  .bar { width:150px; height:6px; background:#232a34; border-radius:3px; overflow:hidden; display:inline-block; vertical-align:middle; margin:0 6px; }
+  .bar i { display:block; height:100%; background:var(--ok); }
+  main { display:grid; grid-template-columns:minmax(0,1fr) 380px; gap:0; flex:1; min-height:0; }
+  #stage { position:relative; overflow:auto; display:flex; align-items:flex-start; justify-content:center; padding:16px; }
+  canvas { background:#000; border:1px solid var(--line); cursor:crosshair; image-rendering:auto; }
+  aside { border-left:1px solid var(--line); background:var(--panel); overflow:auto; padding:14px; }
+  h2 { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:16px 0 8px; font-weight:600; }
+  h2:first-child { margin-top:0; }
+  .lbl { display:flex; align-items:center; gap:8px; padding:7px 9px; border:1px solid transparent; border-radius:7px; cursor:pointer; }
+  .lbl:hover { background:#1c222b; }
+  .lbl.active { border-color:var(--acc); background:#16202c; }
+  .dot { width:11px; height:11px; border-radius:50%; flex:none; }
+  .key { font:11px ui-monospace,Menlo,monospace; color:var(--muted); border:1px solid var(--line); border-radius:4px; padding:0 5px; }
+  .st { margin-left:auto; font-size:12px; color:var(--muted); white-space:nowrap; }
+  .st.ok { color:var(--ok); } .st.abs { color:var(--warn); }
+  #hint { background:#10161d; border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-top:8px; color:#cfd6df; }
+  #hint b { color:#fff; }
+  .row { display:flex; gap:8px; align-items:center; margin-top:8px; flex-wrap:wrap; }
+  .row label { color:var(--muted); font-size:13px; }
+  input[type=range] { padding:0; width:110px; }
+  textarea { width:100%; min-height:48px; resize:vertical; }
+  #msg { min-height:20px; font-size:13px; margin-top:8px; }
+  #msg.bad { color:var(--bad); } #msg.ok { color:var(--ok); }
+  #empty { text-align:center; padding:80px 20px; color:var(--muted); font-size:16px; }
+  dialog { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:10px; max-width:760px; padding:22px 26px; }
+  dialog::backdrop { background:rgba(0,0,0,.6); }
+  dialog h3 { margin:18px 0 6px; font-size:15px; } dialog p,dialog li { color:#cfd6df; } dialog li { margin:4px 0; }
+  kbd { font:12px ui-monospace,Menlo,monospace; border:1px solid var(--line); border-radius:4px; padding:1px 5px; background:#0f1318; }
+  @media (max-width:900px){ body{height:auto;} main{grid-template-columns:1fr;} aside{border-left:0;border-top:1px solid var(--line);} }
+</style>
+</head>
+<body>
+<header>
+  <h1>Разметка ориентиров DXA</h1>
+  <input id="who" placeholder="Ваше имя (латиницей или по-русски)" size="24">
+  <select id="kind"><option value="any">всё подряд</option><option value="spine">только позвоночник</option><option value="hip">только бедро</option></select>
+  <span class="stat" id="s-overlap"></span>
+  <span class="stat" id="s-queue"></span>
+  <span class="stat" id="s-mine"></span>
+  <span class="stat" id="s-busy"></span>
+  <span style="margin-left:auto"></span>
+  <select id="mine"><option value="">мои готовые — открыть…</option></select>
+  <button id="help">Инструкция</button>
+</header>
+<main>
+  <section id="stage"><div id="empty">Введите имя — и начнём.</div><canvas id="cv" hidden></canvas></section>
+  <aside>
+    <h2 id="imgtitle">Снимок</h2>
+    <div id="labels"></div>
+    <div id="hint"></div>
+    <div class="row">
+      <button id="nextlbl" class="primary" style="padding:6px 12px">Дальше → <span class="key" style="color:#06121f;border-color:#06121f55">Пробел</span></button>
+      <button id="absent">Не видно в кадре <span class="key">N</span></button>
+      <button id="undo">Отменить <span class="key">⌘Z</span></button>
+    </div>
+    <h2>Изображение</h2>
+    <div class="row"><label>яркость</label><input type="range" id="br" min="60" max="260" value="120"><label>контраст</label><input type="range" id="ct" min="60" max="260" value="120"></div>
+    <h2>Итог по снимку</h2>
+    <div class="row"><label><input type="checkbox" id="unsure"> сомневаюсь — пусть посмотрит ещё кто-то</label></div>
+    <textarea id="comment" placeholder="Комментарий (необязательно): эндопротез, сколиоз, плохо видно…"></textarea>
+    <div class="row">
+      <button class="primary" id="done">Готово → следующий <span class="key" style="color:#06121f;border-color:#06121f55">Enter</span></button>
+      <button id="skip">Пропустить <span class="key">S</span></button>
+    </div>
+    <div id="msg"></div>
+  </aside>
+</main>
+
+<dialog id="dlg">
+  <h2 style="margin-top:0">Инструкция разметчика</h2>
+  <p>Мы ставим точки на анатомических ориентирах. По ним программа сама посчитает критерии качества из ТЗ: наклон оси, попадание нужных структур в кадр, ротацию бедра и запас поля сканирования. <b>Оценивать качество снимка не нужно</b> — только честно показать, где что находится.</p>
+  <h3>Общие правила</h3>
+  <ul>
+    <li>Ставьте точку <b>туда, где структура реально видна</b>. Не достраивайте в уме то, что ушло за край кадра.</li>
+    <li>Структуры не видно или она не попала в кадр — выберите её в списке и нажмите <b>«Не видно в кадре»</b> (<kbd>N</kbd>). Это важный ответ, а не пропуск.</li>
+    <li>Чёрные прямоугольники по краям — маски лаборанта. Под ними ничего не размечаем.</li>
+    <li>Сколиоз, перелом, эндопротез — размечаем как обычно, по возможности; напишите об этом в комментарии.</li>
+    <li>Точку можно перетащить мышью; правый клик по точке — удалить. Всё сохраняется само.</li>
+    <li>«Лево» и «право» в названиях — это <b>стороны экрана</b>, а не пациента.</li>
+  </ul>
+  <h3>Позвоночник</h3>
+  <ul>
+    <li><b>Центры тел позвонков</b> — клик в центр <u>тела</u> каждого позвонка, видимого целиком, сверху вниз (обычно 4–6). Не остистый отросток, не дужка — центр прямоугольника тела. Закончили — <kbd>Пробел</kbd>. Жёлтая линия через точки — будущая «ось»: если она идёт не по позвоночнику, поправьте точки.</li>
+    <li><b>Th12</b> — последний позвонок с рёбрами. Точка в центр <u>видимой части</u> его тела, даже если виден наполовину. Не попал в кадр — «Не видно».</li>
+    <li><b>Гребни подвздошных костей</b> (слева и справа на экране) — самая верхняя точка гребня. Не попал — «Не видно».</li>
+    <li><b>Посторонний предмет</b> — рамка вокруг каждого (косточки белья, пуговицы, молнии, клипсы). Нет предметов — ничего не рисуем.</li>
+  </ul>
+  <h3>Бедро</h3>
+  <ul>
+    <li><b>Центр головки</b> — центр воображаемой окружности, вписанной в головку.</li>
+    <li><b>Большой вертел: верхушка</b> — самая верхняя точка. <b>Наружный край</b> — самая удалённая от таза точка.</li>
+    <li><b>Шейка: верхний и нижний контур</b> — две точки в самом узком месте шейки, друг напротив друга.</li>
+    <li><b>Малый вертел: вершина</b> — самая выступающая внутрь точка. Затем <b>верхнее и нижнее основание</b> — где его контур переходит в ровный контур кости сверху (к шейке) и снизу (к диафизу). Если малый вертел совсем не контурируется (контур гладкий) — у «вершины» жмём «Не видно»: это и есть признак переротации.</li>
+    <li><b>Седалищная кость</b> — самая нижняя точка седалищного бугра. Не попала в кадр — «Не видно».</li>
+    <li><b>Диафиз: верх и низ</b> — середина между наружным и внутренним контуром кости: сразу под малым вертелом и у нижнего края кадра.</li>
+  </ul>
+  <h3>Клавиши</h3>
+  <p><kbd>1</kbd>…<kbd>9</kbd>,<kbd>0</kbd> — выбрать ориентир · <kbd>Пробел</kbd> — следующий ориентир · <kbd>N</kbd> — не видно · <kbd>⌘Z</kbd>/<kbd>Ctrl+Z</kbd> — отменить · <kbd>Enter</kbd> — готово · <kbd>S</kbd> — пропустить снимок</p>
+  <p style="color:var(--muted)">Первые 10 снимков размечает каждый участник — по ним мы проверим, что все понимают инструкцию одинаково. Дальше очередь общая: готовый снимок исчезает у всех.</p>
+  <div class="row"><button class="primary" id="dlgok">Понятно</button></div>
+</dialog>
+
+<script>
+const T = new URLSearchParams(location.search).get('t') || '';
+const q = (u) => u + (u.includes('?') ? '&' : '?') + (T ? 't=' + encodeURIComponent(T) : '');
+const COLORS = ['#ffd24d','#4da3ff','#39c27d','#ff8a5c','#c58bff','#5fe0d2','#ff6b9a','#9adf4d','#ffb648','#8fb3ff','#e6e9ee','#ff6b6b'];
+const SCHEMA = {
+  spine: [
+    {key:'vb', name:'Центры тел позвонков', multi:true, min:3, hint:'Клик в <b>центр тела</b> каждого позвонка, видимого <b>целиком</b>, сверху вниз (обычно 4–6). Не остистый отросток — именно тело. Отметили все — нажмите <b>«Дальше →»</b> (или Пробел). Жёлтая линия должна идти по позвоночнику; лишнюю точку убирает правый клик.'},
+    {key:'th12', name:'Th12 — видимая часть', optional:true, hint:'Последний позвонок с рёбрами. Точка в центр <b>видимой части</b> тела Th12, даже если виден наполовину. Не попал в кадр — <b>«Не видно»</b>.'},
+    {key:'crest_l', name:'Гребень подвздошной — слева на экране', optional:true, hint:'Самая <b>верхняя</b> точка гребня подвздошной кости в левой части снимка. Гребень не попал в кадр — <b>«Не видно»</b>.'},
+    {key:'crest_r', name:'Гребень подвздошной — справа на экране', optional:true, hint:'Самая <b>верхняя</b> точка гребня в правой части снимка. Не попал в кадр — <b>«Не видно»</b>.'},
+    {key:'artifact', name:'Посторонний предмет (рамка)', box:true, multi:true, free:true, hint:'Зажмите мышь и обведите <b>рамкой</b> каждый посторонний предмет: косточки белья, пуговицы, молнии, клипсы. Предметов нет — ничего не рисуем.'},
+  ],
+  hip: [
+    {key:'head', name:'Головка — центр', hint:'Центр воображаемой <b>окружности</b>, вписанной в головку бедренной кости.'},
+    {key:'gt_top', name:'Большой вертел — верхушка', hint:'Самая <b>верхняя</b> точка большого вертела.'},
+    {key:'gt_lat', name:'Большой вертел — наружный край', hint:'Самая <b>удалённая от таза</b> (латеральная) точка большого вертела.'},
+    {key:'neck_sup', name:'Шейка — верхний контур', hint:'Верхний контур шейки в её <b>самом узком месте</b>.'},
+    {key:'neck_inf', name:'Шейка — нижний контур', hint:'Нижний контур шейки <b>напротив</b> предыдущей точки, в самом узком месте.'},
+    {key:'lt_tip', name:'Малый вертел — вершина', optional:true, cascade:['lt_up','lt_down'], hint:'Самая <b>выступающая внутрь</b> точка малого вертела. Если малый вертел совсем не контурируется (контур гладкий) — <b>«Не видно»</b>: это признак переротации.'},
+    {key:'lt_up', name:'Малый вертел — верхнее основание', optional:true, hint:'Где контур малого вертела <b>сверху</b> переходит в ровный контур кости (в сторону шейки).'},
+    {key:'lt_down', name:'Малый вертел — нижнее основание', optional:true, hint:'Где контур малого вертела <b>снизу</b> переходит в ровный контур диафиза.'},
+    {key:'ischium', name:'Седалищная кость — нижняя точка', optional:true, hint:'Самая <b>нижняя</b> точка седалищного бугра. Седалищная кость не попала в кадр — <b>«Не видно»</b>.'},
+    {key:'shaft_top', name:'Диафиз — центр под малым вертелом', hint:'Середина между наружным и внутренним контуром кости <b>сразу под малым вертелом</b>.'},
+    {key:'shaft_bot', name:'Диафиз — центр у нижнего края', hint:'Середина между контурами кости <b>у нижнего края кадра</b>.'},
+    {key:'artifact', name:'Посторонний предмет (рамка)', box:true, multi:true, free:true, hint:'Обведите <b>рамкой</b> каждый посторонний предмет. Эндопротез рамкой не обводим — пишем в комментарии. Предметов нет — ничего не рисуем.'},
+  ],
+};
+const $ = (id) => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+let cur = null, img = new Image(), scale = 3, active = 0, st = null, drag = null, boxStart = null, history = [], t0 = 0, saveTimer = null, dirty = false;
+
+function blank() { return {points:[], boxes:[], absent:[], unsure:false, comment:''}; }
+function schema() { return SCHEMA[cur.kind]; }
+function who() { return $('who').value.trim(); }
+
+async function api(path, opts) {
+  const r = await fetch(q(path), opts);
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || ('ошибка ' + r.status)); }
+  return r.json();
+}
+function say(text, cls) { $('msg').textContent = text || ''; $('msg').className = cls || ''; }
+
+function showState(s) {
+  if (!s) return;
+  $('s-overlap').innerHTML = `общие: <b>${s.overlap_mine}/${s.overlap_total}</b>`;
+  const pct = s.queue_total ? Math.round(100 * s.queue_done / s.queue_total) : 0;
+  $('s-queue').innerHTML = `очередь: <b>${s.queue_done}/${s.queue_total}</b><span class="bar"><i style="width:${pct}%"></i></span>`;
+  $('s-mine').innerHTML = `мои: <b>${s.mine}</b>`;
+  const b = Object.values(s.busy || {}); const names = [...new Set(b)];
+  $('s-busy').textContent = names.length ? 'сейчас размечают: ' + names.join(', ') : '';
+}
+
+async function loadMine() {
+  if (!who()) return;
+  const r = await api('/api/mine?annotator=' + encodeURIComponent(who()));
+  $('mine').innerHTML = '<option value="">мои готовые — открыть…</option>' + r.ids.map(i => `<option>${i}</option>`).join('');
+}
+
+function setImage(res) {
+  showState(res.state);
+  if (!res.image) { cur = null; cv.hidden = true; $('empty').hidden = false; $('empty').innerHTML = 'Очередь пуста — всё размечено. Спасибо!'; $('labels').innerHTML = ''; $('hint').innerHTML = ''; return; }
+  cur = res.image; st = res.annotation ? {points:res.annotation.points||[], boxes:res.annotation.boxes||[], absent:res.annotation.absent||[], unsure:!!res.annotation.unsure, comment:res.annotation.comment||''} : blank();
+  history = []; dirty = false; t0 = Date.now(); say('');
+  $('unsure').checked = st.unsure; $('comment').value = st.comment;
+  $('imgtitle').textContent = `Снимок ${cur.id} · ${cur.kind === 'spine' ? 'позвоночник' : 'бедро'}${cur.stage === 'overlap' ? ' · общий' : ''}`;
+  img = new Image();
+  img.onload = () => { fit(); $('empty').hidden = true; cv.hidden = false; active = firstPending(); render(); };
+  img.src = q('/img/' + cur.id + '.png');
+}
+function fit() {
+  const box = $('stage').getBoundingClientRect();
+  scale = Math.max(1.5, Math.min(4, (box.height - 40) / cur.h, (box.width - 40) / cur.w));
+  cv.width = Math.round(cur.w * scale); cv.height = Math.round(cur.h * scale);
+}
+async function next() {
+  if (!who()) { say('Сначала введите имя', 'bad'); $('who').focus(); return; }
+  try { setImage(await api(`/api/next?annotator=${encodeURIComponent(who())}&kind=${$('kind').value}`)); loadMine(); }
+  catch (e) { say(e.message, 'bad'); }
+}
+
+function pts(key) { return st.points.filter(p => p.label === key); }
+function status(l) {
+  if (l.box) { const n = st.boxes.filter(b => b.label === l.key).length; return n ? ['ok', n + ' шт.'] : ['', 'нет']; }
+  if (st.absent.includes(l.key)) return ['abs', 'не видно'];
+  const n = pts(l.key).length;
+  if (l.multi) return n >= (l.min || 1) ? ['ok', n + ' точек'] : ['', n ? n + ' — мало' : '—'];
+  return n ? ['ok', '✓'] : ['', '—'];
+}
+function complete(l) { const s = status(l)[0]; return l.free || s === 'ok' || s === 'abs'; }
+function firstPending() { const i = schema().findIndex(l => !complete(l)); return i < 0 ? schema().length - 1 : i; }
+function allDone() { return schema().every(complete); }
+
+function render() {
+  const sc = schema();
+  $('labels').innerHTML = sc.map((l, i) => { const [c, t] = status(l);
+    return `<div class="lbl ${i === active ? 'active' : ''}" data-i="${i}"><span class="dot" style="background:${COLORS[i]}"></span><span class="key" style="${i > 9 ? 'visibility:hidden' : ''}">${(i + 1) % 10}</span><span>${l.name}</span><span class="st ${c}">${t}</span></div>`; }).join('');
+  document.querySelectorAll('.lbl').forEach(el => el.onclick = () => { active = +el.dataset.i; render(); });
+  const l = sc[active];
+  $('hint').innerHTML = `<b>${l.name}.</b> ${l.hint}`;
+  $('absent').disabled = !l.optional; $('absent').style.opacity = l.optional ? 1 : .35;
+  $('done').disabled = !allDone();
+  $('nextlbl').style.display = (l.multi || l.box) ? '' : 'none';
+  draw();
+}
+function draw() {
+  ctx.save(); ctx.filter = `brightness(${$('br').value}%) contrast(${$('ct').value}%)`; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, cv.width, cv.height); ctx.restore();
+  const sc = schema(), S = scale, P = (k) => pts(k)[0];
+  const line = (a, b, col, dash) => { if (!a || !b) return; ctx.beginPath(); ctx.setLineDash(dash || []); ctx.moveTo(a.x * S, a.y * S); ctx.lineTo(b.x * S, b.y * S); ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([]); };
+  if (cur.kind === 'spine') { const v = pts('vb').slice().sort((a, b) => a.y - b.y); for (let i = 1; i < v.length; i++) line(v[i - 1], v[i], '#ffd24d'); }
+  else { line(P('neck_sup'), P('neck_inf'), '#ff8a5c'); line(P('shaft_top'), P('shaft_bot'), '#e6e9ee', [5, 4]); line(P('lt_up'), P('lt_tip'), '#5fe0d2'); line(P('lt_tip'), P('lt_down'), '#5fe0d2'); line(P('lt_up'), P('lt_down'), '#5fe0d2', [3, 3]); }
+  st.boxes.forEach(b => { ctx.strokeStyle = '#ff6b6b'; ctx.lineWidth = 2; ctx.strokeRect(b.x1 * S, b.y1 * S, (b.x2 - b.x1) * S, (b.y2 - b.y1) * S); });
+  if (boxStart && boxStart.cur) { ctx.strokeStyle = '#ff6b6b'; ctx.setLineDash([4, 3]); ctx.strokeRect(boxStart.x * S, boxStart.y * S, (boxStart.cur.x - boxStart.x) * S, (boxStart.cur.y - boxStart.y) * S); ctx.setLineDash([]); }
+  st.points.forEach(p => { const i = sc.findIndex(l => l.key === p.label); ctx.beginPath(); ctx.arc(p.x * S, p.y * S, 5, 0, 7); ctx.fillStyle = COLORS[i]; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = '#000'; ctx.stroke(); });
+}
+function pos(e) { const r = cv.getBoundingClientRect(); return {x: Math.max(0, Math.min(cur.w, (e.clientX - r.left) / scale)), y: Math.max(0, Math.min(cur.h, (e.clientY - r.top) / scale))}; }
+function hit(p) { let best = null, bd = 9 / scale; st.points.forEach(o => { const d = Math.hypot(o.x - p.x, o.y - p.y); if (d < bd) { bd = d; best = o; } }); return best; }
+function snap() { history.push(JSON.stringify(st)); if (history.length > 60) history.shift(); }
+function changed() { dirty = true; render(); clearTimeout(saveTimer); saveTimer = setTimeout(() => save(false), 700); }
+
+cv.addEventListener('contextmenu', e => { e.preventDefault(); const p = pos(e), h = hit(p);
+  if (h) { snap(); st.points = st.points.filter(o => o !== h); changed(); return; }
+  const b = st.boxes.find(b => p.x >= b.x1 && p.x <= b.x2 && p.y >= b.y1 && p.y <= b.y2); if (b) { snap(); st.boxes = st.boxes.filter(o => o !== b); changed(); } });
+cv.addEventListener('mousedown', e => { if (e.button !== 0 || !cur) return; const p = pos(e), h = hit(p), l = schema()[active];
+  if (h && !l.box) { snap(); drag = h; return; }
+  if (l.box) { boxStart = {x: p.x, y: p.y, cur: null}; return; }
+  snap(); st.absent = st.absent.filter(k => k !== l.key);
+  if (l.multi) st.points.push({label: l.key, x: +p.x.toFixed(2), y: +p.y.toFixed(2)});
+  else { st.points = st.points.filter(o => o.label !== l.key); st.points.push({label: l.key, x: +p.x.toFixed(2), y: +p.y.toFixed(2)}); const n = schema().findIndex((x, i) => i > active && !complete(x)); active = n >= 0 ? n : firstPending(); }
+  changed(); });
+window.addEventListener('mousemove', e => { if (!cur) return; if (drag) { const p = pos(e); drag.x = +p.x.toFixed(2); drag.y = +p.y.toFixed(2); draw(); } else if (boxStart) { boxStart.cur = pos(e); draw(); } });
+window.addEventListener('mouseup', e => { if (drag) { drag = null; changed(); }
+  if (boxStart) { const c = boxStart.cur; if (c && Math.abs(c.x - boxStart.x) > 3 && Math.abs(c.y - boxStart.y) > 3) { snap(); st.boxes.push({label: 'artifact', x1: +Math.min(c.x, boxStart.x).toFixed(1), y1: +Math.min(c.y, boxStart.y).toFixed(1), x2: +Math.max(c.x, boxStart.x).toFixed(1), y2: +Math.max(c.y, boxStart.y).toFixed(1)}); }
+    boxStart = null; changed(); } });
+
+function markAbsent() { const l = schema()[active]; if (!l.optional) return; snap();
+  [l.key].concat(l.cascade || []).forEach(k => { st.points = st.points.filter(p => p.label !== k); if (!st.absent.includes(k)) st.absent.push(k); });
+  active = firstPending(); changed(); }
+function undo() { if (!history.length) return; st = JSON.parse(history.pop()); $('unsure').checked = st.unsure; $('comment').value = st.comment; changed(); }
+function nextLabel() { const n = schema().findIndex((x, i) => i > active && !complete(x)); active = n >= 0 ? n : Math.min(active + 1, schema().length - 1); render(); }
+
+async function save(done) {
+  if (!cur || !who()) return;
+  st.unsure = $('unsure').checked; st.comment = $('comment').value;
+  const body = {annotator: who(), image_id: cur.id, kind: cur.kind, points: st.points, boxes: st.boxes, absent: st.absent, unsure: st.unsure, comment: st.comment, done: !!done, seconds: Math.round((Date.now() - t0) / 1000)};
+  try { const r = await api('/api/save', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)}); showState(r.state); dirty = false; if (!done) say('сохранено', 'ok'); return true; }
+  catch (e) { say('не сохранилось: ' + e.message, 'bad'); return false; }
+}
+async function finish() { if (!cur || !allDone()) { say('Остались неразмеченные ориентиры — поставьте точку или «Не видно»', 'bad'); return; } clearTimeout(saveTimer); if (await save(true)) next(); }
+async function skip() { if (!cur) return; clearTimeout(saveTimer); if (dirty) await save(false); await api('/api/release', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({annotator: who(), image_id: cur.id})}).catch(() => {}); next(); }
+
+$('nextlbl').onclick = nextLabel; $('absent').onclick = markAbsent; $('undo').onclick = undo; $('done').onclick = finish; $('skip').onclick = skip;
+$('br').oninput = draw; $('ct').oninput = draw; $('unsure').onchange = changed; $('comment').oninput = () => { dirty = true; clearTimeout(saveTimer); saveTimer = setTimeout(() => save(false), 900); };
+$('help').onclick = () => $('dlg').showModal(); $('dlgok').onclick = () => { $('dlg').close(); localStorage.setItem('dxa_help', '1'); };
+$('kind').onchange = () => { if (cur) skip(); else next(); };
+$('mine').onchange = async (e) => { if (!e.target.value) return; try { setImage(await api(`/api/open?annotator=${encodeURIComponent(who())}&id=${e.target.value}`)); } catch (x) { say(x.message, 'bad'); } e.target.value = ''; };
+$('who').value = localStorage.getItem('dxa_who') || '';
+$('who').onchange = () => { localStorage.setItem('dxa_who', who()); next(); };
+window.addEventListener('resize', () => { if (cur) { fit(); draw(); } });
+window.addEventListener('keydown', e => { if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || !cur) return;
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
+  if (e.key === 'Enter') { e.preventDefault(); finish(); } else if (e.key === ' ') { e.preventDefault(); nextLabel(); }
+  else if (e.key.toLowerCase() === 'n' || e.key.toLowerCase() === 'т') markAbsent();
+  else if (e.key.toLowerCase() === 's' || e.key.toLowerCase() === 'ы') skip();
+  else if (/^[0-9]$/.test(e.key)) { const i = (+e.key + 9) % 10; if (i < schema().length) { active = i; render(); } } });
+window.addEventListener('beforeunload', () => { if (dirty) save(false); });
+if (!localStorage.getItem('dxa_help')) $('dlg').showModal();
+if (who()) next();
+</script>
+</body>
+</html>
