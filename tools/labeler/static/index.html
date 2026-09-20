@@ -85,6 +85,7 @@
   <span class="stat" id="s-queue"></span>
   <span class="stat" id="s-mine"></span>
   <span class="stat" id="s-busy" style="color:var(--muted)"></span>
+  <span class="stat" id="ver" style="color:var(--muted);font-size:12px" title="Номер версии разметчика — меняется после каждого обновления"></span>
   <span style="margin-left:auto"></span>
   <select id="mine"><option value="">мои готовые — открыть…</option></select>
   <button class="btn btn-ghost" id="help">Инструкция</button>
@@ -298,7 +299,7 @@ const SVG_HIP = `
 
 const $ = (id) => document.getElementById(id);
 const cv = $('cv'), ctx = cv.getContext('2d');
-let VIEW = localStorage.getItem('dxa_view') || 'contrast', mouse = null, dpr = 1, autoTone = false, manualTone = false;
+let VIEW = localStorage.getItem('dxa_view') || 'contrast', mouse = null, dpr = 1, autoTone = false, manualTone = false, toneBefore = 35, VER = null;
 const proc = document.createElement('canvas'), raw = document.createElement('canvas'); let rawData = null, lutTimer = null;
 function loadRaw() {                       // исходные пиксели снимка — один раз на загрузку
   raw.width = proc.width = img.naturalWidth; raw.height = proc.height = img.naturalHeight;
@@ -376,6 +377,7 @@ function fit() {
 }
 async function next() {
   if (!WHO) return pickWho();
+  try { const c = await api('api/config'); if (VER && c.version && c.version !== VER) { location.reload(); return; } VER = VER || c.version; $('ver').textContent = 'версия ' + (c.version || '').slice(-4); } catch (e) {}
   try { setImage(await api(`api/next?annotator=${encodeURIComponent(WHO)}&kind=${$('kind').value}`)); loadMine(); }
   catch (e) { say(e.message, 'bad'); }
 }
@@ -413,8 +415,8 @@ function render() {
   const act = document.querySelector('.lbl.active'); if (act) act.scrollIntoView({block:'nearest'});
   const l = sc[active]; guide(l, active);
   { const wantShadows = /^crest_/.test(l.key);                                   // гребни очень тёмные → тени поднимаем сами
-    if (wantShadows && !autoTone && !manualTone) { autoTone = true; $('br').value = 95; $('shadows').classList.add('on'); applyLUT(); }
-    else if (!wantShadows && autoTone) { autoTone = false; $('br').value = cur.kind === 'spine' ? 35 : 0; $('shadows').classList.remove('on'); applyLUT(); } }
+    if (wantShadows && !autoTone) { autoTone = true; toneBefore = $('br').value; $('br').value = 95; $('shadows').classList.add('on'); applyLUT(); }
+    else if (!wantShadows && autoTone) { autoTone = false; $('br').value = toneBefore; $('shadows').classList.toggle('on', +toneBefore >= 90); applyLUT(); } }
   { const n = l.box ? st.boxes.length : pts(l.key).length; $('now').innerHTML = `<span class="dot" style="background:${COLORS[active]}"></span>${allDone() ? 'Всё отмечено — жмите «Готово»' : (l.box ? 'Посторонние предметы: обведите рамкой или «Предметов нет»' : 'Ставим: ' + (l.title || l.name) + (l.multi ? ' · ' + n : ''))}`; }
   $('fuzzy').checked = st.fuzzy.includes(l.key); $('fuzzy').disabled = !!l.box || !pts(l.key).length;
   $('absent').disabled = !l.optional; $('absent').textContent = l.box ? 'Предметов нет' : 'Не видно в кадре'; $('nextlbl').disabled = !(l.multi || l.box);
@@ -490,8 +492,8 @@ $('nextlbl').onclick = nextLabel; $('absent').onclick = markAbsent; $('undo').on
 function setView(v) { VIEW = v; localStorage.setItem('dxa_view', v); $('v-contrast').classList.toggle('on', v === 'contrast'); $('v-sharp').classList.toggle('on', v === 'sharp'); if (cur) { const keep = img; img = new Image(); img.onload = () => { loadRaw(); draw(); }; img.onerror = () => { img = keep; }; img.src = 'imgv/' + v + '/' + cur.id + '.jpg'; } }
 $('v-contrast').onclick = () => setView('contrast'); $('v-sharp').onclick = () => setView('sharp'); $('loupe').onchange = () => { $('loupeBtn').classList.toggle('on', $('loupe').checked); if (cur) draw(); };
 $('loupeBtn').onclick = () => { $('loupe').checked = !$('loupe').checked; $('loupe').onchange(); };
-$('br').oninput = () => { manualTone = true; autoTone = false; $('shadows').classList.remove('on'); retone(); }; $('ct').oninput = retone;
-$('shadows').onclick = () => { manualTone = true; autoTone = false; const on = !$('shadows').classList.contains('on'); $('shadows').classList.toggle('on', on); $('br').value = on ? 95 : (cur && cur.kind === 'spine' ? 35 : 0); retone(); }; $('unsure').onchange = changed;
+$('br').oninput = () => { $('shadows').classList.toggle('on', +$('br').value >= 90); retone(); }; $('ct').oninput = retone;
+$('shadows').onclick = () => { const on = !$('shadows').classList.contains('on'); $('shadows').classList.toggle('on', on); $('br').value = on ? 95 : (cur && cur.kind === 'spine' ? 35 : 0); retone(); }; $('unsure').onchange = changed;
 $('comment').oninput = () => { dirty = true; clearTimeout(saveTimer); saveTimer = setTimeout(() => save(false), 900); };
 $('help').onclick = () => $('dlg').showModal(); $('dlgok').onclick = () => { $('dlg').close(); localStorage.setItem('dxa_help', '1'); };
 $('change').onclick = pickWho;

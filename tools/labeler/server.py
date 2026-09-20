@@ -183,7 +183,8 @@ def img_view(variant: str, iid: str):
 
 @app.get("/api/config")
 def config():
-    return {"names": NAMES, "lease_min": LEASE_MIN, "password": bool(PASSWORD)}
+    ver = str(int(os.path.getmtime(os.path.join(STATIC, "index.html"))))      # страница сама перезагрузится, когда выйдет новая версия
+    return {"names": NAMES, "lease_min": LEASE_MIN, "password": bool(PASSWORD), "version": ver}
 
 
 def _state(who: str) -> dict:
