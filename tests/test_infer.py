@@ -31,7 +31,7 @@ def test_aggregate_uses_official_wording_and_any_rule():
     v = aggregate({"spine_positioning": 0.1, "spine_axis_tilt": 0.9, "spine_artifact": 0.7})
     assert v.quality_class == 1
     assert v.violation_type == "Не выровнена ось позвоночника;Присутствуют посторонние предметы"
-    assert v.quality_prob == 0.9
+    assert v.quality_prob == 0.973          # 1 − (1−0,1)(1−0,9)(1−0,7): два подозрительных критерия > одного
     clean = aggregate({"hip_positioning_rotation": 0.2, "hip_roi_field": 0.1})
     assert (clean.quality_class, clean.violation_type) == (0, "")
     assert set(v.violation_type.split(";")) <= set(VIOLATION_TEXT.values())
