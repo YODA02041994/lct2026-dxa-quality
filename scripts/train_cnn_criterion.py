@@ -28,7 +28,8 @@ import torchvision
 warnings.filterwarnings("ignore")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src"))
-from dxaqc.landmarks import MEAN, STD, letterbox_matrix, random_augment  # noqa: E402
+from dxaqc.cnn import make_net, to_input  # noqa: E402
+from dxaqc.landmarks import letterbox_matrix, random_augment  # noqa: E402
 from sklearn.metrics import average_precision_score, roc_auc_score  # noqa: E402
 from sklearn.model_selection import StratifiedGroupKFold  # noqa: E402
 
@@ -52,25 +53,6 @@ def load(criterion: str):
     return kind, items
 
 
-def to_input(img, M, rng=None):
-    x = cv2.warpAffine(img, M, (SIZE, SIZE), flags=cv2.INTER_LINEAR, borderValue=0).astype(np.float32) / 255.0
-    if rng is not None:
-        x = np.clip(x, 0, 1) ** rng.uniform(0.7, 1.4)
-        x = np.clip(x * rng.uniform(0.85, 1.15) + rng.uniform(-0.05, 0.05), 0, 1)
-        if rng.random() < 0.5:
-            for _ in range(rng.integers(1, 3)):
-                rw, rh = int(rng.uniform(0.08, 0.3) * SIZE), int(rng.uniform(0.15, 0.6) * SIZE)
-                x0 = 0 if rng.random() < 0.5 else SIZE - rw
-                y0 = int(rng.uniform(0, SIZE - rh))
-                x[y0:y0 + rh, x0:x0 + rw] = 0
-    x3 = np.stack([x, x, x])
-    return (x3 - MEAN[:, None, None]) / STD[:, None, None]
-
-
-def make_net():
-    r = torchvision.models.resnet18(weights=torchvision.models.ResNet18_Weights.IMAGENET1K_V1)
-    r.fc = nn.Linear(512, 1)
-    return r
 
 
 def train(items, idx, epochs, device, seed, rotate):

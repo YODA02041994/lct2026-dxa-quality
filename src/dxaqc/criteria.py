@@ -16,19 +16,19 @@ import numpy as np
 from .labels import HIP_FLAGS, SPINE_FLAGS, pixel_mm
 
 SPINE_FEATURES = ["axis_deg", "axis_ok", "n_levels", "L5_present", "th12_present", "crests", "crest_l", "crest_r",
-                  "top_gap_cm", "bottom_gap_cm", "conf_min", "th12_conf", "crest_l_conf", "crest_r_conf", "crests_conf", "axis_img_deg"]
+                  "top_gap_cm", "bottom_gap_cm", "conf_min", "th12_conf", "crest_l_conf", "crest_r_conf", "crests_conf", "axis_img_deg", "cnn_artifact"]
 HIP_FEATURES = ["top_cm", "lat_cm", "bottom_cm", "min_cm", "shaft_deg", "neck_shaft_deg", "neck_mm", "head_gt_dy_mm",
                 "lt_mm", "lt_present", "ischium_present", "ischium_cut", "n_missing", "narrow_frame", "conf_min",
-                "ischium_conf", "lt_conf", "base_conf_min"]
+                "ischium_conf", "lt_conf", "base_conf_min", "frame_h_cm", "frame_w_cm", "lowest_gap_cm", "cnn_hip_pos"]
 
 # Какие признаки видит каждый критерий. При 6–36 положительных примерах лишние признаки только шумят,
 # поэтому наборы короткие и клинически осмысленные (docs/05, эксп. 02–03).
 CRITERION_FEATURES = {
     "spine_positioning": ["crests_conf", "th12_conf", "bottom_gap_cm", "top_gap_cm"],
-    "spine_axis_tilt": ["axis_deg", "axis_img_deg", "n_levels"],
-    "spine_artifact": ["axis_deg"],                      # по ориентирам не определяется — критерий уходит к CNN
-    "hip_positioning_rotation": ["shaft_deg", "ischium_conf", "ischium_cut", "lt_mm", "lt_conf", "n_missing", "base_conf_min"],
-    "hip_roi_field": ["min_cm", "top_cm", "lat_cm", "bottom_cm"],
+    "spine_axis_tilt": ["axis_img_deg", "axis_deg"],
+    "spine_artifact": ["cnn_artifact"],                  # по ориентирам не определяется — только CNN (эксп. 04: AUC 0,76)
+    "hip_positioning_rotation": ["shaft_deg", "ischium_conf", "ischium_cut", "lt_mm", "lt_conf", "n_missing", "base_conf_min", "cnn_hip_pos"],
+    "hip_roi_field": ["min_cm", "frame_h_cm"],
 }
 
 
@@ -52,7 +52,7 @@ def _conf_min(lm: dict) -> float:
     return min(cs) if cs else 0.0
 
 
-def spine_features(lm: dict, h: int, w: int, img: np.ndarray | None = None) -> dict:
+def spine_features(lm: dict, h: int, w: int, img: np.ndarray | None = None, cnn: dict | None = None) -> dict:
     mm = pixel_mm(w)
     levels = [_pt(lm, k) for k in ("L1", "L2", "L3", "L4", "L5")]
     pres = [p for p in levels if p]
@@ -75,6 +75,7 @@ def spine_features(lm: dict, h: int, w: int, img: np.ndarray | None = None) -> d
     f["th12_conf"], f["crest_l_conf"], f["crest_r_conf"] = _conf(lm, "th12"), _conf(lm, "crest_l"), _conf(lm, "crest_r")
     f["crests_conf"] = f["crest_l_conf"] + f["crest_r_conf"]
     f["axis_img_deg"] = spine_axis_from_image(img)
+    f["cnn_artifact"] = float((cnn or {}).get("cnn_artifact", 0.0))
     return f
 
 
@@ -119,7 +120,7 @@ def _near_black(img: np.ndarray | None, x: float, y: float, reach: int = 6) -> f
     return float((below.size > 0 and (below == 0).mean() > 0.8) or int(y) + reach >= h)
 
 
-def hip_features(lm: dict, h: int, w: int, side: str | None, img: np.ndarray | None = None) -> dict:
+def hip_features(lm: dict, h: int, w: int, side: str | None, img: np.ndarray | None = None, cnn: dict | None = None) -> dict:
     mm = pixel_mm(w)
     f = {k: 0.0 for k in HIP_FEATURES}
     head, gt, gl = _pt(lm, "head"), _pt(lm, "gt_top"), _pt(lm, "gt_lat")
@@ -129,9 +130,15 @@ def hip_features(lm: dict, h: int, w: int, side: str | None, img: np.ndarray | N
     f["top_cm"] = gt[1] * mm / 10 if gt else 0.0
     f["lat_cm"] = lateral_x(gl) * mm / 10 if gl else 0.0
     low = ld or lt or st
+    # нижних ориентиров нет в кадре → поле снизу срезано: запас 0, и он ОБЯЗАН войти в минимум
+    # (5 из 7 нарушений поля ROI в обучающем наборе — короткий кадр с вертелом у нижнего края)
     f["bottom_cm"] = (h - low[1]) * mm / 10 if low else 0.0
-    vals = [v for v, p in ((f["top_cm"], gt), (f["lat_cm"], gl), (f["bottom_cm"], low)) if p]
-    f["min_cm"] = min(vals) if vals else 0.0
+    vals = [f["bottom_cm"]] + [v for v, p in ((f["top_cm"], gt), (f["lat_cm"], gl)) if p]
+    f["min_cm"] = min(vals)
+    f["frame_h_cm"], f["frame_w_cm"] = h * mm / 10, w * mm / 10
+    present_y = [p[1] for p in (head, gt, gl, ns, ni, lt, lu, ld, isch, st) if p]
+    f["lowest_gap_cm"] = (h - max(present_y)) * mm / 10 if present_y else 0.0
+    f["cnn_hip_pos"] = float((cnn or {}).get("cnn_hip_pos", 0.0))
     if st and sb:
         f["shaft_deg"] = abs(math.degrees(math.atan2(sb[0] - st[0], sb[1] - st[1])))
     if ns and ni and head and st and sb:

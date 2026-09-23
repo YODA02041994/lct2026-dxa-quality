@@ -79,14 +79,27 @@ def human_landmarks(kind: str) -> dict[str, dict]:
     return out
 
 
+def cnn_oof(kind: str) -> dict[str, dict]:
+    """OOF-вероятности CNN по снимкам (data/work/cnn_oof_<criterion>.json) — как признаки."""
+    names = {"spine": [("spine_artifact", "cnn_artifact")], "hip": [("hip_positioning_rotation", "cnn_hip_pos")]}[kind]
+    out: dict[str, dict] = {}
+    for crit, feat in names:
+        p = os.path.join(WORK, f"cnn_oof_{crit}.json")
+        if os.path.exists(p):
+            for iid, v in json.load(open(p)).items():
+                out.setdefault(iid, {})[feat] = float(v)
+    return out
+
+
 def features_for(kind: str, lms: dict[str, dict], man: dict) -> dict[str, dict]:
     out = {}
+    cnn = cnn_oof(kind)
     for iid, lm in lms.items():
         m = man.get(iid)
         if not m:
             continue
         img = cv2.imread(os.path.join(PNG, iid + ".png"), cv2.IMREAD_GRAYSCALE)
-        out[iid] = spine_features(lm, m["h"], m["w"], img) if kind == "spine" else hip_features(lm, m["h"], m["w"], m["side"], img)
+        out[iid] = spine_features(lm, m["h"], m["w"], img, cnn.get(iid)) if kind == "spine" else hip_features(lm, m["h"], m["w"], m["side"], img, cnn.get(iid))
     return out
 
 
@@ -131,7 +144,7 @@ def best_f1(y, p):
 
 def main():
     man = manifest()
-    models, report = {}, []
+    models, report, oof_all = {}, [], {}
     for kind, crits, feat_names in (("spine", SPINE_CRITERIA, SPINE_FEATURES), ("hip", HIP_CRITERIA, HIP_FEATURES)):
         hum = features_for(kind, human_landmarks(kind), man)
         oof_path = os.path.join(WORK, f"landmarks_oof_{kind}.json")
@@ -181,6 +194,8 @@ def main():
                 f1, thr = best_f1(y, p_nn)
                 row.update({"auc_net_from_human": round(auc_hn, 3), "auc_net": round(auc_nn, 3), "ci_net": [round(lo2, 3), round(hi2, 3)], "f1_net": round(f1, 3), "thr": thr})
                 line += f"{auc_hn:>10.3f}     {auc_nn:.3f} [{lo2:.3f}–{hi2:.3f}]      {f1:.3f} ({thr:.2f})"
+                for i_, pv in zip(np.array(ids)[ok], p_nn):            # OOF-вероятности сети → итоговые метрики (make_report)
+                    oof_all.setdefault(i_, {})[c] = float(pv)
                 m = fit_lr(Xn_c[ok], y)                                # финал: на признаках сети
             else:
                 m = fit_lr(Xh_c[ok], y)
@@ -195,6 +210,7 @@ def main():
     for c, m in models.items():
         out[c]["threshold"] = m["threshold"]
     json.dump({"models": out, "report": report}, open(os.path.join(ROOT, "weights", "criteria.json"), "w"), ensure_ascii=False, indent=1)
+    json.dump(oof_all, open(os.path.join(WORK, "criteria_oof.json"), "w"), ensure_ascii=False)
     print("\nсохранено: weights/criteria.json")
 
 
