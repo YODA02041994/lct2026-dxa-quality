@@ -50,7 +50,7 @@ lines = ["# Метрики (OOF, снимки вне обучения всех �
          "Кросс-валидация по исследованиям, 95 % ДИ — bootstrap по исследованиям. Пороги — по F1 на OOF.", "",
          "## 1. Бинарно: есть ли нарушение на снимке", "", "| метрика | значение [95 % ДИ] |", "|---|---|"]
 for name, fn, pred in (("ROC-AUC", roc_auc_score, p_bin), ("PR-AUC", average_precision_score, p_bin),
-                       ("F1", lambda y, p: f1_score(y, p), c_bin), ("Balanced accuracy", balanced_accuracy_score, c_bin),
+                       ("F1", lambda y, p: f1_score(y, p), c_bin), ("Accuracy", lambda y, p: float((y == p).mean()), c_bin), ("Balanced accuracy", balanced_accuracy_score, c_bin),
                        ("Чувствительность", recall_score, c_bin), ("Специфичность", lambda y, p: recall_score(1 - y, 1 - p), c_bin)):
     v = fn(y_bin, pred); lo, hi = ci(fn, y_bin, pred, groups)
     lines.append(f"| {name} | {v:.3f} [{lo:.3f}–{hi:.3f}] |")

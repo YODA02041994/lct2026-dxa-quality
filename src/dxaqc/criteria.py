@@ -11,23 +11,26 @@ from __future__ import annotations
 
 import math
 
+import cv2
+
 import numpy as np
 
 from .labels import HIP_FLAGS, SPINE_FLAGS, pixel_mm
 
 SPINE_FEATURES = ["axis_deg", "axis_ok", "n_levels", "L5_present", "th12_present", "crests", "crest_l", "crest_r",
-                  "top_gap_cm", "bottom_gap_cm", "conf_min", "th12_conf", "crest_l_conf", "crest_r_conf", "crests_conf", "axis_img_deg", "cnn_artifact"]
+                  "top_gap_cm", "bottom_gap_cm", "conf_min", "th12_conf", "crest_l_conf", "crest_r_conf", "crests_conf", "axis_img_deg", "cnn_artifact",
+                  "bottom_width", "bottom_ratio", "th_frac40", "th_frac40_log", "th_p999", "th_lines", "th_linearea", "bg_median", "axis_min_third"]
 HIP_FEATURES = ["top_cm", "lat_cm", "bottom_cm", "min_cm", "shaft_deg", "neck_shaft_deg", "neck_mm", "head_gt_dy_mm",
                 "lt_mm", "lt_present", "ischium_present", "ischium_cut", "n_missing", "narrow_frame", "conf_min",
-                "ischium_conf", "lt_conf", "base_conf_min", "frame_h_cm", "frame_w_cm", "lowest_gap_cm", "cnn_hip_pos"]
+                "ischium_conf", "lt_conf", "base_conf_min", "frame_h_cm", "frame_w_cm", "lowest_gap_cm", "cnn_hip_pos", "shaft_img_deg"]
 
 # Какие признаки видит каждый критерий. При 6–36 положительных примерах лишние признаки только шумят,
 # поэтому наборы короткие и клинически осмысленные (docs/05, эксп. 02–03).
 CRITERION_FEATURES = {
-    "spine_positioning": ["crests_conf", "th12_conf", "bottom_gap_cm", "top_gap_cm"],
-    "spine_axis_tilt": ["axis_img_deg", "axis_deg"],
-    "spine_artifact": ["cnn_artifact"],                  # по ориентирам не определяется — только CNN (эксп. 04: AUC 0,76)
-    "hip_positioning_rotation": ["shaft_deg", "ischium_conf", "ischium_cut", "lt_mm", "lt_conf", "n_missing", "base_conf_min", "cnn_hip_pos"],
+    "spine_positioning": ["bottom_width", "bottom_ratio", "crests_conf", "th12_conf", "bottom_gap_cm", "top_gap_cm"],
+    "spine_axis_tilt": ["axis_img_deg", "axis_min_third"],   # угол по точкам сети — шум (0,55); прямой наклон ≠ сколиоз (эксп. 05)
+    "spine_artifact": ["th_frac40_log", "cnn_artifact"],  # тонкие яркие линии вне столба (эксп. 05: сырой 0,91; лог — хвост тяжёлый) + CNN
+    "hip_positioning_rotation": ["shaft_img_deg", "ischium_cut", "lt_conf", "n_missing", "base_conf_min", "cnn_hip_pos"],  # без угла и вертела по 2 точкам сети — шум (эксп. 05)
     "hip_roi_field": ["min_cm", "frame_h_cm"],
 }
 
@@ -75,8 +78,62 @@ def spine_features(lm: dict, h: int, w: int, img: np.ndarray | None = None, cnn:
     f["th12_conf"], f["crest_l_conf"], f["crest_r_conf"] = _conf(lm, "th12"), _conf(lm, "crest_l"), _conf(lm, "crest_r")
     f["crests_conf"] = f["crest_l_conf"] + f["crest_r_conf"]
     f["axis_img_deg"] = spine_axis_from_image(img)
+    f["axis_min_third"] = spine_axis_min_third(img)
     f["cnn_artifact"] = float((cnn or {}).get("cnn_artifact", 0.0))
+    f["bottom_width"], f["bottom_ratio"] = bottom_bone_width(img)
+    f.update(artifact_features(img))
     return f
+
+
+def _fit_angle(ys: np.ndarray, xs: np.ndarray) -> float:
+    if len(ys) < 8:
+        return 0.0
+    k = np.polyfit(ys, xs, 1)[0]
+    res = xs - (k * ys + np.median(xs - k * ys))
+    keep = np.abs(res) < np.percentile(np.abs(res), 80)
+    if keep.sum() >= 6:
+        k = np.polyfit(ys[keep], xs[keep], 1)[0]
+    return math.degrees(math.atan(k))
+
+
+def spine_axis_min_third(img: np.ndarray | None) -> float:
+    """Наименьший |наклон| среди трёх третей позвоночника. Косая укладка наклоняет весь столб (все трети),
+    сколиоз — дуга: хотя бы одна треть почти вертикальна (эксп. 05: сколиозы давали ложные тревоги по оси)."""
+    c = _spine_centroids(img)
+    if c is None:
+        return 0.0
+    ys, xs = c
+    n = ys.max() - ys.min()
+    if n < 30:
+        return abs(_fit_angle(ys, xs))
+    angs = []
+    for i in range(3):
+        sel = (ys >= ys.min() + n * i / 3) & (ys < ys.min() + n * (i + 1) / 3)
+        angs.append(abs(_fit_angle(ys[sel], xs[sel])))
+    return float(min(angs))
+
+
+def _spine_centroids(img: np.ndarray | None):
+    """Центры масс кости по строкам в центральной трети кадра (без верхних рёбер и нижнего таза)."""
+    if img is None:
+        return None
+    h, w = img.shape
+    band = img[int(h * 0.15):int(h * 0.85)].astype(np.float32)
+    nz = band[band > 0]
+    if nz.size < 100:
+        return None
+    m = (band >= np.percentile(nz, 70)).astype(np.float32)
+    m[:, :int(w * 0.3)] = 0
+    m[:, int(w * 0.7):] = 0
+    ys, xs = [], []
+    for r in range(m.shape[0]):
+        row = m[r]
+        if row.sum() >= 3:
+            ys.append(r)
+            xs.append(float((row * np.arange(w)).sum() / row.sum()))
+    if len(ys) < 20:
+        return None
+    return np.array(ys, float), np.array(xs, float)
 
 
 def spine_axis_from_image(img: np.ndarray | None) -> float:
@@ -110,6 +167,94 @@ def spine_axis_from_image(img: np.ndarray | None) -> float:
     return abs(math.degrees(math.atan(k)))
 
 
+def shaft_axis_from_image(img: np.ndarray | None, x_seed: float, rows_frac: float = 0.30, pct: int = 55) -> float:
+    """Наклон диафиза бедра к вертикали — главная ось (PCA) связной области кости в нижних 30 % кадра.
+    Затравка — только колонка нижней точки диафиза (у сети ошибка 3,7 мм). Угол по двум точкам сети на коротком
+    отрезке рассыпается (эксп. 05: r = 0,24 с врачом, AUC 0,60); по массе кости — r = 0,47, AUC 0,74 ≈ как по точкам врача."""
+    if img is None:
+        return 0.0
+    h, w = img.shape
+    nz = img[img > 0]
+    if nz.size < 50:
+        return 0.0
+    y0 = int(h * (1 - rows_frac))
+    m = (img[y0:] >= np.percentile(nz, pct)).astype(np.uint8)
+    n, lab, stats, _ = cv2.connectedComponentsWithStats(m, connectivity=8)
+    best, bd = None, 1e9
+    for r in range(m.shape[0] - 1, max(0, m.shape[0] - 6), -1):
+        xs = np.where(lab[r] > 0)[0]
+        if xs.size:
+            j = xs[np.argmin(np.abs(xs - x_seed))]
+            if abs(j - x_seed) < bd:
+                bd, best = abs(j - x_seed), lab[r, j]
+    if best is None or bd > 25 or stats[best, cv2.CC_STAT_AREA] < 60:
+        return 0.0
+    ys, xs = np.where(lab == best)
+    pts = np.stack([xs, ys], 1).astype(np.float32)
+    cov = np.cov((pts - pts.mean(0)).T)
+    ev, evec = np.linalg.eigh(cov)
+    v = evec[:, int(np.argmax(ev))]
+    return abs(math.degrees(math.atan2(v[0], v[1])))
+
+
+def artifact_features(img: np.ndarray | None) -> dict:
+    """Посторонние предметы на снимке позвоночника (эксп. 05, монтаж 17 положительных): это тонкие яркие линии и
+    дуги у краёв кадра (фурнитура одежды, цепочки) и «серая вуаль» плотной ткани. Ориентиры их не видят, CNN — слабо
+    (0,73–0,76). Здесь: верхний top-hat (ядро 9 px) выделяет тонкие яркие структуры; считаем их вне столба
+    позвоночника (±20 % ширины от центра столба) и вне чёрных масок. th_frac40 — доля пикселей с откликом > 40
+    (AUC 0,91), th_p999 — 99,9-й перцентиль отклика (0,90), th_lines — число вытянутых компонент (0,78),
+    bg_median — яркость фона в средней полосе (вуаль, 0,65)."""
+    f = {"th_frac40": 0.0, "th_frac40_log": 0.0, "th_p999": 0.0, "th_lines": 0.0, "th_linearea": 0.0, "bg_median": 0.0}
+    if img is None:
+        return f
+    h, w = img.shape
+    nz = img[img > 0]
+    if nz.size < 100:
+        return f
+    thr = np.percentile(nz, 70)
+    mid = img[int(h * 0.2):int(h * 0.8)]
+    cols = np.convolve((mid >= thr).mean(0), np.ones(15) / 15, "same")
+    cx = int(np.argmax(cols))
+    outside = np.ones((h, w), bool)
+    outside[:, max(0, cx - int(w * 0.2)):min(w, cx + int(w * 0.2))] = False
+    outside &= img > 0
+    th = cv2.morphologyEx(img, cv2.MORPH_TOPHAT, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)))
+    r = th[outside].astype(np.float32)
+    if r.size:
+        f["th_frac40"] = float((r > 40).mean())
+        f["th_frac40_log"] = float(np.log1p(1000.0 * f["th_frac40"]))      # хвост тяжёлый: 0 у большинства, до 0,05 у предметов
+        f["th_p999"] = float(np.percentile(r, 99.9))
+    m = ((th > 50) & outside).astype(np.uint8)
+    n, lab, st, _ = cv2.connectedComponentsWithStats(m, connectivity=8)
+    for i in range(1, n):
+        a, bw, bh = st[i, cv2.CC_STAT_AREA], st[i, cv2.CC_STAT_WIDTH], st[i, cv2.CC_STAT_HEIGHT]
+        if a >= 12 and max(bw, bh) / max(1, min(bw, bh)) >= 2.5:
+            f["th_lines"] += 1
+            f["th_linearea"] += float(a)
+    bg = mid[outside[int(h * 0.2):int(h * 0.8)]]
+    if bg.size:
+        f["bg_median"] = float(np.median(bg))
+    return f
+
+
+def bottom_bone_width(img: np.ndarray | None, frac: float = 0.10) -> tuple[float, float]:
+    """Гребни подвздошных костей в кадре → в нижних 10 % строк широкая яркая полоса (таз), иначе — только узкий
+    столб позвоночника/крестца. Доля колонок с костью внизу и её отношение к ширине столба в середине кадра.
+    Без ориентиров; эксп. 05: AUC 0,90 против «некорректной укладки» позвоночника (у уверенности сети по гребням — 0,79)."""
+    if img is None:
+        return 0.0, 0.0
+    h, w = img.shape
+    nz = img[img > 0]
+    if nz.size < 100:
+        return 0.0, 0.0
+    thr = np.percentile(nz, 70)
+    bot = img[int(h * (1 - frac)):]
+    mid = img[int(h * 0.4):int(h * 0.6)]
+    bw = float((bot.max(0) >= thr).mean())
+    mw = float((mid.max(0) >= thr).mean())
+    return bw, bw / max(mw, 1e-3)
+
+
 def _near_black(img: np.ndarray | None, x: float, y: float, reach: int = 6) -> float:
     """Точка у границы чёрной маски / края кадра — структура обрезана (используется для седалищной кости)."""
     if img is None:
@@ -141,6 +286,7 @@ def hip_features(lm: dict, h: int, w: int, side: str | None, img: np.ndarray | N
     f["cnn_hip_pos"] = float((cnn or {}).get("cnn_hip_pos", 0.0))
     if st and sb:
         f["shaft_deg"] = abs(math.degrees(math.atan2(sb[0] - st[0], sb[1] - st[1])))
+    f["shaft_img_deg"] = shaft_axis_from_image(img, sb[0]) if sb else 0.0
     if ns and ni and head and st and sb:
         mid = ((ns[0] + ni[0]) / 2, (ns[1] + ni[1]) / 2)
         ax = (head[0] - mid[0], head[1] - mid[1])

@@ -80,14 +80,22 @@ def human_landmarks(kind: str) -> dict[str, dict]:
 
 
 def cnn_oof(kind: str) -> dict[str, dict]:
-    """OOF-вероятности CNN по снимкам (data/work/cnn_oof_<criterion>.json) — как признаки."""
-    names = {"spine": [("spine_artifact", "cnn_artifact")], "hip": [("hip_positioning_rotation", "cnn_hip_pos")]}[kind]
+    """OOF-вероятности CNN (data/work/cnn_oof_<имя>.json), усреднённые по источникам из CNN_SOURCES — как признаки."""
+    from dxaqc.cnn import CNN_SOURCES
     out: dict[str, dict] = {}
-    for crit, feat in names:
-        p = os.path.join(WORK, f"cnn_oof_{crit}.json")
-        if os.path.exists(p):
+    for feat, names in CNN_SOURCES.items():
+        if not feat.startswith("cnn_hip") == (kind == "hip"):
+            continue
+        acc: dict[str, list] = {}
+        for n in names:
+            p = os.path.join(WORK, f"cnn_oof_{n}.json")
+            if not os.path.exists(p):
+                print(f"  ! нет {p} — источник пропущен")
+                continue
             for iid, v in json.load(open(p)).items():
-                out.setdefault(iid, {})[feat] = float(v)
+                acc.setdefault(iid, []).append(float(v))
+        for iid, vs in acc.items():
+            out.setdefault(iid, {})[feat] = float(np.mean(vs))
     return out
 
 

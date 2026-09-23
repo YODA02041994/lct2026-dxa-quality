@@ -63,12 +63,12 @@ class LandmarkPredictor(Predictor):
         from .landmarks import Localizer
         self.loc = {"spine": Localizer("spine", os.path.join(weights_dir, "landmarks_spine.pt"), device),
                     "hip": Localizer("hip", os.path.join(weights_dir, "landmarks_hip.pt"), device)}
-        from .cnn import CnnScorer
+        from .cnn import CNN_SOURCES, CnnEnsemble
         self.cnn = {}
-        for crit, feat in (("spine_artifact", "cnn_artifact"), ("hip_positioning_rotation", "cnn_hip_pos")):
-            p = os.path.join(weights_dir, f"cnn_{crit}.pt")
-            if os.path.exists(p):
-                self.cnn[feat] = CnnScorer(p, device)
+        for feat, names in CNN_SOURCES.items():
+            ens = CnnEnsemble(weights_dir, names, device)
+            if len(ens):
+                self.cnn[feat] = ens
         cj = json.load(open(os.path.join(weights_dir, "criteria.json"), encoding="utf-8"))
         self.crit = CriteriaModel.from_json(cj["models"])
         self.thresholds = {c: float(m.get("threshold", DEFAULT_THRESHOLD)) for c, m in cj["models"].items()}
@@ -83,7 +83,7 @@ class LandmarkPredictor(Predictor):
             feats = spine_features(lm, h, w, img, cnn)
         else:
             lm = self.loc["hip"].predict(img, side)
-            cnn = {"cnn_hip_pos": self.cnn["cnn_hip_pos"].score(img, side)} if "cnn_hip_pos" in self.cnn else {}
+            cnn = {"cnn_hip_pos": self.cnn["cnn_hip_pos"].score(img, side, lm)} if "cnn_hip_pos" in self.cnn else {}
             feats = hip_features(lm, h, w, side, img, cnn)
         probs = self.crit.predict(feats, flags_for(region))
         self._last = {"landmarks": lm, "features": feats, "probs": probs}
