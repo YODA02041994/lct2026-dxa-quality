@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dxaqc-api",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["PYTHONPATH=src", "python3", "-m", "uvicorn", "dxaqc.api:app", "--host", "127.0.0.1", "--port", "8877"],
+      "port": 8877
+    }
+  ]
+}

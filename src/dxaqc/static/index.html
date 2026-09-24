@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Контроль качества DXA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#faf7f2;--card:#fff;--ink:#1f1d1a;--muted:#6b665f;--line:#e8e2d8;--accent:#e5735b;--accent2:#c7553d;--ok:#2e8b57;--bad:#c9382a;--warn:#c98a1f}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Nunito,system-ui,sans-serif;line-height:1.45}
+  header{padding:22px 16px 10px;max-width:1180px;margin:0 auto}
+  h1{font-size:26px;margin:0 0 4px;font-weight:800}
+  header p{margin:0;color:var(--muted)}
+  main{max-width:1180px;margin:0 auto;padding:0 16px 40px}
+  .drop{display:block;margin:16px 0;border:2px dashed #cbbfae;border-radius:14px;background:var(--card);padding:28px;text-align:center;cursor:pointer;transition:.15s}
+  .drop.over{border-color:var(--accent);background:#fff5f1}
+  .drop b{color:var(--accent2)}
+  .drop small{display:block;color:var(--muted);margin-top:6px}
+  input[type=file]{display:none}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0}
+  button{font:inherit;font-weight:700;border:0;border-radius:10px;padding:10px 16px;background:var(--accent);color:#fff;cursor:pointer}
+  button:disabled{opacity:.5;cursor:default}
+  button.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+  .stat{display:flex;gap:14px;flex-wrap:wrap;margin:10px 0;color:var(--muted)}
+  .stat b{color:var(--ink)}
+  table{width:100%;border-collapse:collapse;background:var(--card);border-radius:12px;overflow:hidden;font-size:14px}
+  th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:#f3eee6;font-weight:700;color:#4a453e;position:sticky;top:0}
+  tr.bad td:first-child{border-left:4px solid var(--bad)}
+  tr.ok td:first-child{border-left:4px solid var(--ok)}
+  tr.fail td:first-child{border-left:4px solid var(--warn)}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+  .pill.bad{background:#fbe3df;color:var(--bad)} .pill.ok{background:#e1f3e8;color:var(--ok)} .pill.fail{background:#fbefd9;color:var(--warn)}
+  .bar{display:inline-block;width:70px;height:8px;background:#eee;border-radius:4px;vertical-align:middle;margin-left:6px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--accent)}
+  .crit{font-size:12px;color:var(--muted);white-space:nowrap}
+  .crit span{display:inline-block;margin-right:8px}
+  .crit span.hit{color:var(--bad);font-weight:700}
+  a.lnk{color:var(--accent2);cursor:pointer;text-decoration:underline}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:16px}
+  .modal.show{display:flex}
+  .modal img{max-width:100%;max-height:92vh;border-radius:10px;background:#000}
+  .err{background:#fbe3df;color:var(--bad);padding:10px 14px;border-radius:10px;margin:8px 0}
+  .muted{color:var(--muted)}
+  @media (max-width:700px){table{font-size:12px} th,td{padding:6px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Контроль качества денситометрии</h1>
+  <p>Загрузите DICOM-файлы или zip с исследованиями: сервис определит область, найдёт нарушения укладки и объяснит решение. Формат таблицы — как в ТЗ.</p>
+</header>
+<main>
+  <label class="drop" id="drop">
+    <input type="file" id="file" multiple accept=".dcm,.dicom,.zip">
+    <b>Перетащите файлы сюда</b> или нажмите, чтобы выбрать<small>.dcm по одному или .zip с папками исследований (до 500 МБ)</small>
+  </label>
+  <div class="row">
+    <button id="go" disabled>Проверить</button>
+    <span id="picked" class="muted">файлы не выбраны</span>
+    <span style="flex:1"></span>
+    <a class="ghost" id="dl-xlsx" style="display:none"><button class="ghost">results.xlsx</button></a>
+    <a class="ghost" id="dl-csv" style="display:none"><button class="ghost">results.csv</button></a>
+    <a href="docs" target="_blank"><button class="ghost">API (Swagger)</button></a>
+  </div>
+  <div id="err" class="err" style="display:none"></div>
+  <div id="stat" class="stat"></div>
+  <div id="tbl"></div>
+</main>
+<div class="modal" id="modal" onclick="this.classList.remove('show')"><img id="modal-img" alt=""></div>
+<script>
+const $=s=>document.querySelector(s);
+let files=[];
+const drop=$('#drop'), inp=$('#file');
+inp.onchange=()=>{files=[...inp.files];pick();};
+['dragenter','dragover'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('over')}));
+drop.addEventListener('drop',ev=>{files=[...ev.dataTransfer.files];pick();});
+function pick(){$('#picked').textContent=files.length?`${files.length} файл(ов), ${(files.reduce((a,f)=>a+f.size,0)/1048576).toFixed(1)} МБ`:'файлы не выбраны';$('#go').disabled=!files.length;}
+const SHORT={spine_positioning:'укладка',spine_axis_tilt:'ось',spine_artifact:'предметы',hip_positioning_rotation:'укладка/ротация',hip_roi_field:'поле ROI'};
+$('#go').onclick=async()=>{
+  const fd=new FormData(); files.forEach(f=>fd.append('files',f,f.name));
+  $('#go').disabled=true; $('#go').textContent='Считаю…'; $('#err').style.display='none'; $('#tbl').innerHTML=''; $('#stat').innerHTML='';
+  try{
+    const r=await fetch('api/analyze',{method:'POST',body:fd}); const j=await r.json();
+    if(!r.ok||j.error) throw new Error(j.error||j.detail||r.statusText);
+    render(j);
+  }catch(e){$('#err').textContent='Ошибка: '+e.message;$('#err').style.display='block';}
+  $('#go').disabled=false; $('#go').textContent='Проверить';
+};
+function render(j){
+  const s=j.summary;
+  $('#stat').innerHTML=`<span>файлов <b>${s.files}</b></span><span>обработано <b>${s.success}</b></span><span>сбоев <b>${s.failure}</b></span><span>уникальных снимков <b>${s.unique_images}</b></span><span>время <b>${s.seconds} с</b></span>`;
+  $('#dl-xlsx').href=s.xlsx; $('#dl-csv').href=s.csv; $('#dl-xlsx').style.display=$('#dl-csv').style.display='inline';
+  const rows=j.rows.map(r=>{
+    const st=r.processing_status!=='Success'?'fail':(r.quality_class?'bad':'ok');
+    const crit=r.details?Object.entries(r.details.probs).map(([k,v])=>`<span class="${r.violation_type&&v>=0.5?'hit':''}">${SHORT[k]||k} ${v.toFixed(2)}</span>`).join(''):'';
+    const p=r.quality_prob!=null?Number(r.quality_prob):0;
+    return `<tr class="${st}"><td>${r.n+1}</td><td>${esc(r.path_to_study)}${r.duplicate_of?`<div class="muted">дубликат ${esc(r.duplicate_of)}</div>`:''}</td>
+      <td>${esc(r.anatomical_region||'')}${r.side?` (${r.side})`:''}</td>
+      <td>${st==='fail'?`<span class="pill fail">Failure</span><div class="muted">${esc(r.error_message||'')}</div>`:(r.quality_class?`<span class="pill bad">нарушение</span>`:`<span class="pill ok">норма</span>`)}</td>
+      <td>${esc(r.violation_type||'')}</td>
+      <td>${st==='fail'?'':`${p.toFixed(2)}<span class="bar"><i style="width:${Math.round(p*100)}%"></i></span>`}<div class="crit">${crit}</div></td>
+      <td>${st==='fail'?'':`<a class="lnk" onclick="show('${j.run_id}',${r.n})">снимок</a>`}</td></tr>`;}).join('');
+  $('#tbl').innerHTML=`<table><thead><tr><th>#</th><th>файл</th><th>область</th><th>класс</th><th>тип нарушения</th><th>вероятность · критерии</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function show(id,n){$('#modal-img').src=`api/runs/${id}/overlay/${n}.png?t=${Date.now()}`;$('#modal').classList.add('show');}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+</script>
+</body>
+</html>
