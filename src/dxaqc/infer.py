@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import logging
 import os
 import shutil
@@ -22,7 +23,7 @@ from openpyxl import Workbook
 
 from .labels import PROB_COLUMN, REGION_HIP
 from .loader import _pixel_hash
-from .predict import NullPredictor, Predictor, aggregate
+from .predict import NullPredictor, Predictor, aggregate, load_default_predictor
 from .region import hip_side, region_by_width
 
 log = logging.getLogger("dxaqc")
@@ -30,7 +31,7 @@ log = logging.getLogger("dxaqc")
 # официальные колонки ТЗ (п. 2.5) + разрешённая quality_prob; затем наши служебные — проверке не мешают
 OFFICIAL = ["path_to_study", "study_uid", "image_uid", "anatomical_region", "quality_class",
             "violation_type", PROB_COLUMN, "processing_status", "time_of_processing"]
-SERVICE = ["study_dir", "side", "duplicate_of", "error_message"]
+SERVICE = ["study_dir", "side", "duplicate_of", "error_message", "details"]
 COLUMNS = OFFICIAL + SERVICE
 
 
@@ -127,8 +128,12 @@ def process_file(path: str, root: str, predictor: Predictor, cache: dict) -> dic
             row["duplicate_of"] = first
         else:
             side = hip_side(img).side if region == REGION_HIP else ""
-            verdict = aggregate(predictor.predict_flags(img, region, side or None))
+            verdict = aggregate(predictor.predict_flags(img, region, side or None), predictor.thresholds)
             cache[h] = (verdict, side, rel)
+        ex = predictor.explain() if row["duplicate_of"] == "" else {}
+        row["details"] = json.dumps({"probs": {k: round(v, 4) for k, v in verdict.flag_probs.items()},
+                                     "landmarks": {k: [round(v["x"], 1), round(v["y"], 1), round(v.get("conf", 1), 2)] for k, v in ex.get("landmarks", {}).items() if v.get("present")},
+                                     "features": {k: round(float(v), 2) for k, v in ex.get("features", {}).items()}}, ensure_ascii=False) if ex else ""
         row.update({"anatomical_region": region, "side": side, "quality_class": verdict.quality_class,
                     "violation_type": verdict.violation_type, PROB_COLUMN: verdict.quality_prob,
                     "processing_status": "Success"})
@@ -160,7 +165,11 @@ def write_csv(rows: list[dict], path: str) -> None:
 
 def run(input_path: str, output_dir: str, predictor: Predictor | None = None,
         fmt: str = "both") -> tuple[list[dict], RunSummary]:
-    predictor = predictor or NullPredictor()
+    predictor = predictor or load_default_predictor()
+    if isinstance(predictor, NullPredictor):
+        log.warning("веса модели не найдены — работает заглушка NullPredictor (нарушений нет)")
+    else:
+        log.info("модель: %s", predictor.name)
     os.makedirs(output_dir, exist_ok=True)
     t0 = time.perf_counter()
     tmp = None

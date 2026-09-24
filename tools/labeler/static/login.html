@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Разметка DXA — вход</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#FFF9F2; --ink:#2B2330; --muted:#7A6E80; --coral:#FF7A59; --coral-dk:#E85D3C; --peach:#FFE9DC; --line:#E4D3C4; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:grid; place-items:center; padding:20px; background:var(--bg); color:var(--ink);
+         font:500 16px/1.6 'Nunito',system-ui,-apple-system,'Segoe UI',sans-serif; -webkit-font-smoothing:antialiased; }
+  .card { width:min(440px,100%); background:#fff; border:3px solid var(--ink); border-radius:26px; padding:34px 32px; box-shadow:7px 7px 0 rgba(43,35,48,.10); }
+  .ico { width:58px; height:58px; border-radius:18px; display:grid; place-items:center; font-size:27px; border:2.5px solid var(--ink); background:var(--peach); margin-bottom:18px; }
+  h1 { font:700 28px/1.14 'Georgia',serif; letter-spacing:-.02em; margin:0 0 8px; }
+  p { margin:0 0 22px; color:var(--muted); font-weight:600; font-size:15px; }
+  label { display:block; font-weight:800; font-size:14px; margin-bottom:8px; }
+  input { width:100%; font:inherit; font-weight:700; padding:14px 18px; border:3px solid var(--ink); border-radius:16px; background:var(--bg); color:var(--ink); outline:none; }
+  input:focus { border-color:var(--coral); }
+  button { margin-top:20px; width:100%; font:inherit; font-weight:800; font-size:16px; padding:15px 28px; border-radius:999px; border:3px solid transparent;
+           background:var(--coral); color:#fff; box-shadow:0 7px 0 var(--coral-dk); cursor:pointer; transition:.2s ease; }
+  button:hover { transform:translateY(3px); box-shadow:0 4px 0 var(--coral-dk); }
+  .err { display:none; margin-top:16px; padding:10px 14px; border-radius:14px; background:#FFE3DC; border:2px solid var(--coral-dk); color:#8a2d17; font-weight:700; font-size:14px; }
+  .err.on { display:block; }
+  small { display:block; margin-top:22px; color:var(--muted); font-size:13px; font-weight:600; }
+</style>
+</head>
+<body>
+  <form class="card" method="post" action="login">
+    <div class="ico">🦴</div>
+    <h1>Разметка снимков DXA</h1>
+    <p>Рабочий инструмент команды хакатона ЛЦТ-2026. Введите пароль, который прислал капитан.</p>
+    <label for="p">Пароль</label>
+    <input id="p" name="password" type="password" autocomplete="current-password" autofocus required>
+    <button type="submit">Войти</button>
+    <div class="err" id="e"></div>
+    <small>Снимки обезличены. Пожалуйста, не передавайте ссылку и пароль за пределы команды.</small>
+  </form>
+<script>
+  const e = new URLSearchParams(location.search).get('e'), box = document.getElementById('e');
+  if (e === '1') { box.textContent = 'Пароль не подошёл. Проверьте раскладку и регистр.'; box.classList.add('on'); }
+  if (e === 'wait') { box.textContent = 'Слишком много попыток. Подождите 10 минут.'; box.classList.add('on'); }
+</script>
+</body>
+</html>
