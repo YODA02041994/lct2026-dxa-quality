@@ -19,9 +19,15 @@ SIZE = 320
 # инференс — weights/cnn_<имя>.pt. Ансамбль разных сетей/меток устойчивее одной (эксп. 05: бедро 0,74 → 0,80).
 CNN_SOURCES = {
     "cnn_artifact": ["spine_artifact_r18_512"],                    # 512 px: тонкие линии видны лучше (OOF 0,83 против 0,76 на 320)
-    "cnn_hip_pos": ["hip_positioning_rotation_eff_320",            # EfficientNet-B0 по всему кадру (0,76)
-                    "hip_any_r18_320",                             # ResNet18 на метке «любое нарушение бедра» (0,79)
-                    "hip_positioning_rotation_lt100"],             # ResNet18 на вырезке 100 px вокруг малого вертела и шейки (0,82)
+    "cnn_hip_pos": [                                               # эксп. 06: ансамбль «разных взглядов» на бедро → OOF 0,88
+        "hip_positioning_rotation_eff_320",                        # EfficientNet-B0 по всему кадру (0,76)
+        "hip_any_r18_320",                                         # ResNet18 по кадру на метке «любое нарушение бедра» (0,79)
+        "hip_positioning_rotation_lt100",                          # ResNet18, вырезка 100 px вокруг малого вертела и шейки (0,82)
+        "hip_positioning_rotation_lt100_e40",                      # то же, 40 эпох (0,86)
+        "hip_positioning_rotation_isch100",                        # вырезка 100 px вокруг седалищной кости (0,83)
+        "hip_positioning_rotation_prox170",                        # вырезка 170 px — весь проксимальный отдел (0,82)
+        "hip_any_any_lt100",                                       # вырезка вертела на метке «любое нарушение» (0,85)
+    ],
 }
 
 
