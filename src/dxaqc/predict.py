@@ -75,6 +75,10 @@ class LandmarkPredictor(Predictor):
         cj = json.load(open(os.path.join(weights_dir, "criteria.json"), encoding="utf-8"))
         self.crit = CriteriaModel.from_json(cj["models"])
         self.thresholds = {c: float(m.get("threshold", DEFAULT_THRESHOLD)) for c, m in cj["models"].items()}
+        mode = os.environ.get("DXAQC_MODE", "competition")             # competition (F1-оптимум) | sensitive (recall ≥ 0,9 по критерию)
+        if mode != "competition" and mode in cj.get("modes", {}):
+            self.thresholds = {c: float(t) for c, t in cj["modes"][mode].items()}
+        self.mode = mode
         self._last: dict = {}
 
     def predict_flags(self, img, region, side):

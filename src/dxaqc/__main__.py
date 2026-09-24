@@ -19,8 +19,12 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--input", "-i", required=True)
     r.add_argument("--output", "-o", required=True)
     r.add_argument("--format", choices=["xlsx", "csv", "both"], default="both")
+    r.add_argument("--mode", choices=["competition", "sensitive"], default=None,
+                   help="пороги: competition — максимум F1 (по умолчанию); sensitive — чувствительность ≥ 0,9 по критерию (клиника)")
     args = ap.parse_args(argv)
 
+    if args.mode:
+        os.environ["DXAQC_MODE"] = args.mode
     warnings.filterwarnings("ignore")
     # UID организатора длиннее стандарта DICOM — pydicom пишет предупреждение на каждый файл; это шум
     logging.getLogger("pydicom").setLevel(logging.ERROR)
