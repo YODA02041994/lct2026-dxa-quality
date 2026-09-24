@@ -18,7 +18,11 @@ SIZE = 320
 # Признак критерия ← список обученных CNN (усредняются). Обучение критериев берёт data/work/cnn_oof_<имя>.json,
 # инференс — weights/cnn_<имя>.pt. Ансамбль разных сетей/меток устойчивее одной (эксп. 05: бедро 0,74 → 0,80).
 CNN_SOURCES = {
-    "cnn_artifact": ["spine_artifact_r18_512"],                    # 512 px: тонкие линии видны лучше (OOF 0,83 против 0,76 на 320)
+    "cnn_artifact": [                                              # эксп. 12: предобучение на object-CXR (10 тыс. рентгенов с посторонними
+        "spine_artifact_r18_320_ocxrF",                            # предметами, CC BY-NC 4.0) → дообучение на DXA; 3 семени: OOF 0,86/0,84/0,87,
+        "spine_artifact_r18_320_ocxrF_s1",                         # ансамбль 0,87 (ImageNet-инициализация: 0,77 @320, 0,83 @512)
+        "spine_artifact_r18_320_ocxrF_s2",
+    ],
     "cnn_hip_pos": [                                               # эксп. 06: ансамбль «разных взглядов» на бедро → OOF 0,88
         "hip_positioning_rotation_eff_320",                        # EfficientNet-B0 по всему кадру (0,76)
         "hip_any_r18_320",                                         # ResNet18 по кадру на метке «любое нарушение бедра» (0,79)
@@ -69,9 +73,16 @@ def make_net(pretrained: bool = True, arch: str = "resnet18", init: str | None =
     else:
         raise ValueError(f"неизвестная архитектура {arch}")
     if init:
-        n = load_radimagenet(r, init)
+        sd = torch.load(init, map_location="cpu", weights_only=False)
+        sd = sd.state_dict() if isinstance(sd, nn.Module) else sd.get("state_dict", sd)
+        if any(k.startswith("backbone.") for k in sd):
+            n = load_radimagenet(r, init)
+        else:                                                     # наш же формат (torchvision), fc не берём
+            sd = {k: v for k, v in sd.items() if not k.startswith(("fc.", "classifier."))}
+            missing, unexpected = r.load_state_dict(sd, strict=False)
+            n = len(sd) - len(unexpected)
         if n < 100:
-            raise ValueError(f"RadImageNet-веса не легли на {arch}: загружено {n} тензоров")
+            raise ValueError(f"веса {init} не легли на {arch}: загружено {n} тензоров")
     return r
 
 

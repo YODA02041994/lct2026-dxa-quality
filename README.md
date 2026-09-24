@@ -26,7 +26,7 @@ API: `POST /api/analyze` (multipart `files` — .dcm или .zip) → JSON с `r
 
 ## Веса модели
 
-В git весов нет (~360 МБ). Скачать из GitHub Release: `scripts/download_weights.sh` (тег `v0.2.0`; пока репозиторий приватный — нужен авторизованный `gh`). Без весов `python -m dxaqc run` работает заглушкой и пишет предупреждение.
+В git весов нет (~360 МБ). Скачать из GitHub Release: `scripts/download_weights.sh` (тег `v0.3.0`; пока репозиторий приватный — нужен авторизованный `gh`). Без весов `python -m dxaqc run` работает заглушкой и пишет предупреждение.
 
 ## Навигация
 
