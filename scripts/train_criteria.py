@@ -96,6 +96,11 @@ def cnn_oof(kind: str) -> dict[str, dict]:
                 acc.setdefault(iid, []).append(float(v))
         for iid, vs in acc.items():
             out.setdefault(iid, {})[feat] = float(np.mean(vs))
+    if kind == "spine":                                              # карта предметов (object-CXR, без обучения на DXA)
+        p = os.path.join(WORK, "objmap_spine.json")
+        if os.path.exists(p):
+            for iid, v in json.load(open(p)).items():
+                out.setdefault(iid, {}).update({"om_max_all": v["om_max_all"], "om_max": v["om_max"], "om_area": float(np.log1p(1000.0 * v["om_area"]))})
     return out
 
 

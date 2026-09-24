@@ -69,6 +69,9 @@ class LandmarkPredictor(Predictor):
             ens = CnnEnsemble(weights_dir, names, device)
             if len(ens):
                 self.cnn[feat] = ens
+        from .cnn import ObjMapScorer
+        om_path = os.path.join(weights_dir, "objmap_objectcxr_r18fpn.pt")
+        self.objmap = ObjMapScorer(om_path, device) if os.path.exists(om_path) else None
         cj = json.load(open(os.path.join(weights_dir, "criteria.json"), encoding="utf-8"))
         self.crit = CriteriaModel.from_json(cj["models"])
         self.thresholds = {c: float(m.get("threshold", DEFAULT_THRESHOLD)) for c, m in cj["models"].items()}
@@ -80,15 +83,20 @@ class LandmarkPredictor(Predictor):
         if region == REGION_SPINE:
             lm = self.loc["spine"].predict(img)
             cnn = {"cnn_artifact": self.cnn["cnn_artifact"].score(img)} if "cnn_artifact" in self.cnn else {}
+            boxes = []
+            if self.objmap is not None:
+                om, boxes = self.objmap.features(img)
+                cnn.update(om)
             feats = spine_features(lm, h, w, img, cnn)
         else:
+            boxes = []
             lm = self.loc["hip"].predict(img, side)
             cnn = {"cnn_hip_pos": self.cnn["cnn_hip_pos"].score(img, side, lm)} if "cnn_hip_pos" in self.cnn else {}
             feats = hip_features(lm, h, w, side, img, cnn)
         probs = self.crit.predict(feats, flags_for(region))
         from .criteria import explain
         comment, advice = explain(region, feats, probs, self.thresholds)
-        self._last = {"landmarks": lm, "features": feats, "probs": probs, "comment": comment, "advice": advice}
+        self._last = {"landmarks": lm, "features": feats, "probs": probs, "comment": comment, "advice": advice, "objects": boxes}
         return probs
 
     def explain(self) -> dict:

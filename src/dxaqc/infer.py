@@ -133,7 +133,7 @@ def process_file(path: str, root: str, predictor: Predictor, cache: dict) -> dic
         ex = predictor.explain() if row["duplicate_of"] == "" else {}
         row["details"] = json.dumps({"probs": {k: round(v, 4) for k, v in verdict.flag_probs.items()},
                                      "needs_review": verdict.needs_review, "review_flags": verdict.review_flags,
-                                     "comment": ex.get("comment", ""), "advice": ex.get("advice", []),
+                                     "comment": ex.get("comment", ""), "advice": ex.get("advice", []), "objects": ex.get("objects", []),
                                      "landmarks": {k: [round(v["x"], 1), round(v["y"], 1), round(v.get("conf", 1), 2)] for k, v in ex.get("landmarks", {}).items() if v.get("present")},
                                      "features": {k: round(float(v), 2) for k, v in ex.get("features", {}).items()}}, ensure_ascii=False) if ex else ""
         row.update({"anatomical_region": region, "side": side, "quality_class": verdict.quality_class,

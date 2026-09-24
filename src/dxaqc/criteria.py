@@ -19,7 +19,8 @@ from .labels import HIP_FLAGS, REGION_SPINE, SPINE_FLAGS, pixel_mm
 
 SPINE_FEATURES = ["axis_deg", "axis_ok", "n_levels", "L5_present", "th12_present", "crests", "crest_l", "crest_r",
                   "top_gap_cm", "bottom_gap_cm", "conf_min", "th12_conf", "crest_l_conf", "crest_r_conf", "crests_conf", "axis_img_deg", "cnn_artifact",
-                  "bottom_width", "bottom_ratio", "th_frac40", "th_frac40_log", "th_p999", "th_lines", "th_linearea", "bg_median", "axis_min_third", "soft_mean"]
+                  "bottom_width", "bottom_ratio", "th_frac40", "th_frac40_log", "th_p999", "th_lines", "th_linearea", "bg_median", "axis_min_third", "soft_mean",
+                  "om_max_all", "om_max", "om_area"]
 HIP_FEATURES = ["top_cm", "lat_cm", "bottom_cm", "min_cm", "shaft_deg", "neck_shaft_deg", "neck_mm", "head_gt_dy_mm",
                 "lt_mm", "lt_present", "ischium_present", "ischium_cut", "n_missing", "narrow_frame", "conf_min",
                 "ischium_conf", "lt_conf", "base_conf_min", "frame_h_cm", "frame_w_cm", "lowest_gap_cm", "cnn_hip_pos", "shaft_img_deg"]
@@ -29,7 +30,7 @@ HIP_FEATURES = ["top_cm", "lat_cm", "bottom_cm", "min_cm", "shaft_deg", "neck_sh
 CRITERION_FEATURES = {
     "spine_positioning": ["bottom_width", "soft_mean"],   # полоса таза внизу + средняя яркость мягких тканей (эксп. 13: сырой 0,83; крупный пациент → гребни вне кадра)
     "spine_axis_tilt": ["axis_img_deg", "axis_min_third"],   # угол по точкам сети — шум (0,55); прямой наклон ≠ сколиоз (эксп. 05)
-    "spine_artifact": ["th_frac40_log", "cnn_artifact"],  # тонкие яркие линии вне столба (эксп. 05: сырой 0,91; лог — хвост тяжёлый) + CNN
+    "spine_artifact": ["th_frac40_log", "cnn_artifact", "om_max_all", "om_area"],  # top-hat (эксп. 05) + CNN (эксп. 12) + карта предметов object-CXR (эксп. 13: 0,90 → 0,93)
     "hip_positioning_rotation": ["shaft_img_deg", "cnn_hip_pos"],   # эксп. 06: с сильным ансамблем CNN остальные точечные признаки только шумят; ось диафиза — для объяснимости
     "hip_roi_field": ["min_cm", "frame_h_cm"],
 }
@@ -80,6 +81,8 @@ def spine_features(lm: dict, h: int, w: int, img: np.ndarray | None = None, cnn:
     f["axis_img_deg"] = spine_axis_from_image(img)
     f["axis_min_third"] = spine_axis_min_third(img)
     f["cnn_artifact"] = float((cnn or {}).get("cnn_artifact", 0.0))
+    for k in ("om_max_all", "om_max", "om_area"):
+        f[k] = float((cnn or {}).get(k, 0.0))
     f["bottom_width"], f["bottom_ratio"] = bottom_bone_width(img)
     f["soft_mean"] = float(img[img > 0].mean()) if img is not None and (img > 0).any() else 0.0
     f.update(artifact_features(img))

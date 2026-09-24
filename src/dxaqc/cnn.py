@@ -188,3 +188,46 @@ class CnnScorer:
             mats.append(M)
         xs = torch.from_numpy(np.stack([to_input(img, M, size=self.size) for M in mats])).to(self.device)
         return float(np.mean([torch.sigmoid(n(xs))[:, 0].mean().item() for n in self.nets]))
+
+
+class ObjMapScorer:
+    """Карта «где посторонний предмет» (ResNet18+FPN, обучена на масках object-CXR, эксп. 13; на DXA применяется без дообучения).
+    features(img) → om_max_all (максимум карты), om_area (лог доли пикселей > 0,5 вне столба позвоночника), om_max (максимум вне столба);
+    boxes — до 5 рамок самых ярких пятен для оверлея и details."""
+
+    def __init__(self, weights: str, device: str | None = None):
+        from .landmarks import HeatmapNet
+        self.device = device or ("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
+        ck = torch.load(weights, map_location="cpu", weights_only=False)
+        self.size = int(ck.get("size", 320))
+        self.net = HeatmapNet(1, pretrained=False)
+        self.net.load_state_dict(ck["state_dict"]); self.net.to(self.device).eval()
+
+    @torch.no_grad()
+    def heatmap(self, img: np.ndarray) -> np.ndarray:
+        h, w = img.shape
+        M = letterbox_matrix(h, w, self.size)
+        x = torch.from_numpy(to_input(img, M, size=self.size, masks=False))[None].to(self.device)
+        hm = torch.sigmoid(self.net(x))[0, 0].cpu().numpy()
+        hm = cv2.resize(hm, (self.size, self.size))
+        return cv2.warpAffine(hm, cv2.invertAffineTransform(M), (w, h))
+
+    def features(self, img: np.ndarray) -> tuple[dict, list]:
+        hm = self.heatmap(img); h, w = img.shape
+        nz = img[img > 0]
+        f = {"om_max_all": float(hm.max()), "om_max": 0.0, "om_area": 0.0}
+        if nz.size >= 100:
+            thr = np.percentile(nz, 70); mid = img[int(h * 0.2):int(h * 0.8)]
+            cx = int(np.argmax(np.convolve((mid >= thr).mean(0), np.ones(15) / 15, "same")))
+            outside = np.ones((h, w), bool); outside[:, max(0, cx - int(w * 0.2)):min(w, cx + int(w * 0.2))] = False; outside &= img > 0
+            if outside.any():
+                f["om_max"] = float(hm[outside].max()); f["om_area"] = float(np.log1p(1000.0 * (hm[outside] > 0.5).mean()))
+        boxes = []
+        n, lab, st, _ = cv2.connectedComponentsWithStats((hm > 0.5).astype(np.uint8), connectivity=8)
+        for i in range(1, n):
+            x0, y0, bw, bh, a = st[i]
+            if a < 6:
+                continue
+            boxes.append({"x": int(x0), "y": int(y0), "w": int(bw), "h": int(bh), "score": round(float(hm[y0:y0 + bh, x0:x0 + bw].max()), 2)})
+        boxes.sort(key=lambda b: -b["score"])
+        return f, boxes[:5]

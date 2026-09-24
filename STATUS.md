@@ -17,10 +17,10 @@
 ## В работе
 - **main = PR #34 + PR #35 (24.09), веса в Release `v0.2.0` (`scripts/download_weights.sh`):** DICOM → область → локализатор ориентиров (ResNet18+FPN, тепловые карты)
   → признаки (углы, запасы в см, уверенность) + CNN-второе мнение → логрегрессии по 5 критериям → официальный `results.xlsx`.
-  Полный прогон 499 файлов — 33 с на Маке, 0 Failure. **Метрики OOF после эксп. 12** (`docs/metrics.md`): бинарно ROC-AUC 0,83,
-  F1 0,74, accuracy 0,84; по типам AUC 0,80–0,90 (укладка бедра 0,87 — ансамбль 7 CNN; предметы 0,90, F1 0,78 — CNN с предобучкой на object-CXR), macro-F1 0,63 (было 0,74 / 0,58 / 0,54). Подробно — `docs/05`, `docs/08`.
-- Веса: 14 файлов (~800 МБ) — GitHub Release `v0.3.0`, `scripts/download_weights.sh`; в Docker-образ копируются при сборке (пересобрать после смены весов!)
-- **Прототип LIVE: https://docsemenov.ru/dxa/** (24.09) — страница загрузки DICOM/zip, Swagger `/dxa/docs`, оверлеи с ориентирами и вердиктом;
+  Полный прогон 499 файлов — 33 с на Маке, 0 Failure. **Метрики OOF после эксп. 15** (`docs/metrics.md`): бинарно ROC-AUC 0,85,
+  F1 0,75, accuracy 0,85; по типам AUC 0,80–0,92 (укладка бедра 0,87 — ансамбль 7 CNN; предметы 0,92 — top-hat + CNN с предобучкой object-CXR + карта предметов object-CXR; укладка позвоночника 0,90), macro-F1 0,65 (было 0,74 / 0,58 / 0,54). Подробно — `docs/05`, `docs/08`.
+- Веса: 15 файлов (~820 МБ, + `objmap_objectcxr_r18fpn.pt`) — GitHub Release `v0.3.0`, `scripts/download_weights.sh`; в Docker-образ копируются при сборке (пересобрать после смены весов!)
+- **Прототип LIVE: https://docsemenov.ru/dxa/** (24.09) — страница загрузки DICOM/zip, Swagger `/dxa/docs`, оверлеи с ориентирами, рамками предметов и вердиктом; в каждой строке протокол измерений, совет лаборанту, флаг «проверить»; в xlsx второй лист «по исследованиям»;
   на vps: `/opt/dxaqc` (venv, torch CPU), служба `dxaqc-api` (127.0.0.1:8890, `--root-path /dxa`, `DXAQC_NETS_PER_FILE=1`, MemoryMax 5G — с полным ансамблем 13 файлов ловил OOM), nginx `location ^~ /dxa/`; 2 файла ≈ 3,5 с
 - Docker: `Dockerfile` (python:3.12-slim + torch CPU, веса внутри), `dxaqc run`/`dxaqc serve`; образ **amd64 собран (1,1 ГБ)** и проверен на тестовой папке (3 файла, 0 Failure); архив `docker save` — `~/Downloads/lct_task4/docker/` (вне git)
 - 🔑 numpy 2: `ndarray.ptp()` убран (на vps/в Docker numpy 2.5) — иначе позвоночник падал в Failure

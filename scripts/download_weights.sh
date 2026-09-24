@@ -7,7 +7,7 @@ set -euo pipefail
 REPO="YODA02041994/lct2026-dxa-quality"
 TAG="${TAG:-v0.3.0}"
 DIR="$(cd "$(dirname "$0")/.." && pwd)/weights"
-FILES=(landmarks_spine.pt landmarks_hip.pt cnn_spine_artifact_r18_320_ocxrF.pt cnn_spine_artifact_r18_320_ocxrF_s1.pt cnn_spine_artifact_r18_320_ocxrF_s2.pt cnn_hip_positioning_rotation_eff_320.pt cnn_hip_any_r18_320.pt cnn_hip_positioning_rotation_lt100.pt cnn_hip_positioning_rotation_lt100_e40.pt cnn_hip_positioning_rotation_isch100.pt cnn_hip_positioning_rotation_prox170.pt cnn_hip_any_any_lt100.pt pretrain_objectcxr_full320_r18.pt criteria.json)
+FILES=(landmarks_spine.pt landmarks_hip.pt cnn_spine_artifact_r18_320_ocxrF.pt cnn_spine_artifact_r18_320_ocxrF_s1.pt cnn_spine_artifact_r18_320_ocxrF_s2.pt cnn_hip_positioning_rotation_eff_320.pt cnn_hip_any_r18_320.pt cnn_hip_positioning_rotation_lt100.pt cnn_hip_positioning_rotation_lt100_e40.pt cnn_hip_positioning_rotation_isch100.pt cnn_hip_positioning_rotation_prox170.pt cnn_hip_any_any_lt100.pt pretrain_objectcxr_full320_r18.pt objmap_objectcxr_r18fpn.pt criteria.json)
 mkdir -p "$DIR"
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   gh release download "$TAG" --repo "$REPO" --dir "$DIR" --clobber
