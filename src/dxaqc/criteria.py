@@ -30,7 +30,7 @@ CRITERION_FEATURES = {
     "spine_positioning": ["bottom_width", "bottom_ratio", "crests_conf", "th12_conf", "bottom_gap_cm", "top_gap_cm"],
     "spine_axis_tilt": ["axis_img_deg", "axis_min_third"],   # угол по точкам сети — шум (0,55); прямой наклон ≠ сколиоз (эксп. 05)
     "spine_artifact": ["th_frac40_log", "cnn_artifact"],  # тонкие яркие линии вне столба (эксп. 05: сырой 0,91; лог — хвост тяжёлый) + CNN
-    "hip_positioning_rotation": ["shaft_img_deg", "ischium_cut", "lt_conf", "n_missing", "base_conf_min", "cnn_hip_pos"],  # без угла и вертела по 2 точкам сети — шум (эксп. 05)
+    "hip_positioning_rotation": ["shaft_img_deg", "cnn_hip_pos"],   # эксп. 06: с сильным ансамблем CNN остальные точечные признаки только шумят; ось диафиза — для объяснимости
     "hip_roi_field": ["min_cm", "frame_h_cm"],
 }
 
@@ -62,7 +62,7 @@ def spine_features(lm: dict, h: int, w: int, img: np.ndarray | None = None, cnn:
     f = {k: 0.0 for k in SPINE_FEATURES}
     if len(pres) >= 2:
         xs, ys = np.array([p[0] for p in pres]), np.array([p[1] for p in pres])
-        k = np.polyfit(ys, xs, 1)[0] if ys.ptp() > 1 else 0.0
+        k = np.polyfit(ys, xs, 1)[0] if np.ptp(ys) > 1 else 0.0
         f["axis_deg"] = abs(math.degrees(math.atan(k)))
         f["axis_ok"] = 1.0
     f["n_levels"] = float(len(pres))

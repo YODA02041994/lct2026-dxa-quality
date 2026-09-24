@@ -1,0 +1,10 @@
+services:
+  dxaqc:
+    build: .
+    image: dxaqc
+    ports: ["8000:8000"]
+    volumes:
+      - ./in:/in
+      - ./out:/out
+    environment:
+      - DXAQC_RUN_TTL_MIN=180

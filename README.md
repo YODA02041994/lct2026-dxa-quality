@@ -12,9 +12,21 @@
 > организатора (датасет, разметка, ТЗ, шаблон) в git **не хранятся** — их скачивает `scripts/download_data.sh`
 > по паролю из чата задачи. Ничего из `data/`, `docs/materials/`, `docs/img/`, `docs/transcripts/` не коммитить.
 
+## Сервис и Docker
+
+```bash
+PYTHONPATH=src uvicorn dxaqc.api:app --port 8000     # страница http://localhost:8000, Swagger /docs
+docker build -t dxaqc . && docker run --rm -p 8000:8000 dxaqc            # сервис в контейнере (CPU)
+docker run --rm -v "$PWD/in:/in" -v "$PWD/out:/out" dxaqc run -i /in -o /out   # пакетно, как CLI
+```
+
+API: `POST /api/analyze` (multipart `files` — .dcm или .zip) → JSON с `results` в официальном формате и ссылками на
+`results.xlsx`/`results.csv`; `GET /api/runs/{id}/overlay/{n}.png` — снимок с ориентирами и вердиктом; `GET /health`.
+За обратным прокси с префиксом — `uvicorn dxaqc.api:app --root-path /dxa`.
+
 ## Веса модели
 
-В git весов нет (~360 МБ). Скачать из GitHub Release: `scripts/download_weights.sh` (тег `v0.1.0-mvp`; пока репозиторий приватный — нужен авторизованный `gh`). Без весов `python -m dxaqc run` работает заглушкой и пишет предупреждение.
+В git весов нет (~360 МБ). Скачать из GitHub Release: `scripts/download_weights.sh` (тег `v0.2.0`; пока репозиторий приватный — нужен авторизованный `gh`). Без весов `python -m dxaqc run` работает заглушкой и пишет предупреждение.
 
 ## Навигация
 
