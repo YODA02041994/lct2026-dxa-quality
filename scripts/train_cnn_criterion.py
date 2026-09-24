@@ -69,10 +69,10 @@ def load(criterion: str, crop: str | None = None, half: int = 50):
 
 
 
-def train(items, idx, epochs, device, seed, rotate, arch="resnet18", size=SIZE, masks=True):
+def train(items, idx, epochs, device, seed, rotate, arch="resnet18", size=SIZE, masks=True, init=None):
     torch.manual_seed(seed)
     rng = np.random.default_rng(seed)
-    net = make_net(arch=arch).to(device)
+    net = make_net(arch=arch, init=init).to(device)
     pos = sum(items[i]["y"] for i in idx)
     pw = torch.tensor([(len(idx) - pos) / max(1, pos)], device=device)
     opt = torch.optim.AdamW(net.parameters(), lr=3e-4, weight_decay=1e-3)
@@ -144,6 +144,7 @@ def main():
     ap.add_argument("--half", type=int, default=50, help="полуширина вырезки, px")
     ap.add_argument("--seed", type=int, default=0, help="семя разбиения на фолды (усреднение OOF по семенам)")
     ap.add_argument("--tta", type=int, default=1, help="число вариантов сдвига/масштаба при предсказании")
+    ap.add_argument("--init", default=None, help="путь к весам RadImageNet ResNet50.pt (инициализация вместо ImageNet)")
     a = ap.parse_args()
     name = a.criterion + (f"_{a.tag}" if a.tag else "")
     device = "mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu")
@@ -154,7 +155,7 @@ def main():
     print(f"{a.criterion} [{a.arch} @ {a.size}px, {a.epochs} эп.]: снимков {len(items)}, нарушений {int(y.sum())} | {device} | повороты в аугментации: {'да' if rotate else 'нет'}")
     oof, sds, t0 = {}, [], time.time()
     for f, (tr, te) in enumerate(StratifiedGroupKFold(n_splits=a.folds, shuffle=True, random_state=a.seed).split(items, y, groups)):
-        net = train(items, tr, a.epochs, device, seed=f + 10 * a.seed, rotate=rotate, arch=a.arch, size=a.size, masks=(kind == "hip" and not a.crop))
+        net = train(items, tr, a.epochs, device, seed=f + 10 * a.seed, rotate=rotate, arch=a.arch, size=a.size, masks=(kind == "hip" and not a.crop), init=a.init)
         oof.update(predict(net, items, te, device, size=a.size, tta=a.tta))
         sds.append({k: v.detach().cpu().half() for k, v in net.state_dict().items()})
         yt = y[te]
@@ -164,11 +165,11 @@ def main():
     auc, ap_ = roc_auc_score(y, p), average_precision_score(y, p)
     print(f"=== OOF {a.criterion}: ROC-AUC {auc:.3f} | PR-AUC {ap_:.3f} (доля позитивов {y.mean():.2f})")
     json.dump(oof, open(os.path.join(WORK, f"cnn_oof_{name}.json"), "w"))
-    net = train(items, np.arange(len(items)), a.epochs, device, seed=42, rotate=rotate, arch=a.arch, size=a.size, masks=(kind == "hip" and not a.crop))
+    net = train(items, np.arange(len(items)), a.epochs, device, seed=42, rotate=rotate, arch=a.arch, size=a.size, masks=(kind == "hip" and not a.crop), init=a.init)
     final = {k: v.detach().cpu().half() for k, v in net.state_dict().items()}
     os.makedirs(os.path.join(ROOT, "weights"), exist_ok=True)
     path = os.path.join(ROOT, "weights", f"cnn_{name}.pt")
-    torch.save({"state_dict": final, "state_dicts": [final] + sds[:2], "criterion": a.criterion, "kind": kind, "size": a.size, "arch": a.arch, "crop": a.crop, "half": a.half, "tta": a.tta,
+    torch.save({"state_dict": final, "state_dicts": [final] + sds[:2], "criterion": a.criterion, "kind": kind, "size": a.size, "arch": a.arch, "crop": a.crop, "half": a.half, "tta": a.tta, "init": ("radimagenet" if a.init else "imagenet"),
                 "oof_auc": auc, "trained_on": len(items)}, path)
     print(f"сохранено: {path} ({os.path.getsize(path) // 1048576} МБ), OOF → data/work/cnn_oof_{name}.json")
 

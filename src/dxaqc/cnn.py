@@ -34,8 +34,27 @@ CNN_SOURCES = {
 ARCHS = ("resnet18", "resnet34", "resnet50", "convnext_tiny", "efficientnet_b0")
 
 
-def make_net(pretrained: bool = True, arch: str = "resnet18") -> nn.Module:
-    """Предобученный на ImageNet классификатор с одним выходом (логит нарушения)."""
+RADIMAGENET_MAP = {"backbone.0.": "conv1.", "backbone.1.": "bn1.", "backbone.4.": "layer1.", "backbone.5.": "layer2.",
+                   "backbone.6.": "layer3.", "backbone.7.": "layer4."}
+
+
+def load_radimagenet(net: nn.Module, path: str) -> int:
+    """RadImageNet (BMEII-AI) ResNet50: ключи backbone.N.* → torchvision. Возвращает число загруженных тензоров."""
+    sd = torch.load(path, map_location="cpu", weights_only=False)
+    sd = sd.state_dict() if isinstance(sd, nn.Module) else sd.get("state_dict", sd)
+    out = {}
+    for k, v in sd.items():
+        for a, b in RADIMAGENET_MAP.items():
+            if k.startswith(a):
+                out[b + k[len(a):]] = v
+                break
+    missing, unexpected = net.load_state_dict(out, strict=False)
+    return len(out) - len(unexpected)
+
+
+def make_net(pretrained: bool = True, arch: str = "resnet18", init: str | None = None) -> nn.Module:
+    """Классификатор с одним выходом (логит нарушения). init — путь к весам RadImageNet (только resnet50):
+    инициализация с радиологических изображений вместо ImageNet (эксп. 11)."""
     tm = torchvision.models
     if arch == "resnet18":
         r = tm.resnet18(weights=tm.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None); r.fc = nn.Linear(512, 1)
@@ -49,6 +68,10 @@ def make_net(pretrained: bool = True, arch: str = "resnet18") -> nn.Module:
         r = tm.efficientnet_b0(weights=tm.EfficientNet_B0_Weights.IMAGENET1K_V1 if pretrained else None); r.classifier[1] = nn.Linear(1280, 1)
     else:
         raise ValueError(f"неизвестная архитектура {arch}")
+    if init:
+        n = load_radimagenet(r, init)
+        if n < 100:
+            raise ValueError(f"RadImageNet-веса не легли на {arch}: загружено {n} тензоров")
     return r
 
 
