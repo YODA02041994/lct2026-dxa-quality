@@ -147,6 +147,31 @@ def process_file(path: str, root: str, predictor: Predictor, cache: dict) -> dic
     return row
 
 
+def study_summary(rows: list[dict]) -> list[dict]:
+    """Второй лист: одна строка на исследование — что переснять. Официальный лист остаётся первым и не меняется."""
+    by: dict[str, list[dict]] = {}
+    for r in rows:
+        by.setdefault(r["study_dir"], []).append(r)
+    out = []
+    for study, rs in by.items():
+        uniq = [r for r in rs if r["processing_status"] == "Success" and r["duplicate_of"] == ""]
+        bad = [r for r in uniq if r["quality_class"] == 1]
+        review = [r for r in uniq if r["details"] and json.loads(r["details"]).get("needs_review")]
+        advice = []
+        for r in bad:
+            for a in json.loads(r["details"]).get("advice", []):
+                if a not in advice:
+                    advice.append(a)
+        out.append({"study_dir": study, "files": len(rs), "images": len(uniq), "failures": sum(r["processing_status"] != "Success" for r in rs),
+                    "violations": len(bad), "needs_review": len(review),
+                    "regions_to_repeat": "; ".join(sorted({f"{r['anatomical_region']}{' ' + r['side'] if r['side'] else ''}: {r['violation_type']}" for r in bad})),
+                    "advice": " ".join(advice)})
+    return out
+
+
+SUMMARY_COLUMNS = ["study_dir", "files", "images", "failures", "violations", "needs_review", "regions_to_repeat", "advice"]
+
+
 def write_xlsx(rows: list[dict], path: str) -> None:
     wb = Workbook()
     ws = wb.active
@@ -154,6 +179,10 @@ def write_xlsx(rows: list[dict], path: str) -> None:
     ws.append(COLUMNS)
     for r in rows:
         ws.append([r[c] if r[c] != "" else None for c in COLUMNS])
+    ws2 = wb.create_sheet("по исследованиям")
+    ws2.append(SUMMARY_COLUMNS)
+    for r in study_summary(rows):
+        ws2.append([r[c] for c in SUMMARY_COLUMNS])
     wb.save(path)
 
 
