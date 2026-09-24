@@ -20,7 +20,10 @@
   Полный прогон 499 файлов — 33 с на Маке, 0 Failure. **Метрики OOF после эксп. 06** (`docs/metrics.md`): бинарно ROC-AUC 0,82,
   F1 0,73, accuracy 0,83; по типам AUC 0,80–0,90 (укладка бедра 0,87 — ансамбль 7 CNN), macro-F1 0,61 (было 0,74 / 0,58 / 0,54). Подробно — `docs/05` (эксп. 03–06).
 - Веса: 11 файлов, 604 МБ — GitHub Release `v0.2.0`, `scripts/download_weights.sh`; в Docker-образ копируются при сборке
-- В работе (ветка `exp-06-paradigms`): HTTP-сервис `dxaqc.api` (страница загрузки + Swagger + оверлеи с ориентирами), Dockerfile CPU — Claude
+- **Прототип LIVE: https://docsemenov.ru/dxa/** (24.09) — страница загрузки DICOM/zip, Swagger `/dxa/docs`, оверлеи с ориентирами и вердиктом;
+  на vps: `/opt/dxaqc` (venv, torch CPU), служба `dxaqc-api` (127.0.0.1:8890, `--root-path /dxa`), nginx `location ^~ /dxa/`; 3 файла ≈ 7 с на 2 ядрах
+- Docker: `Dockerfile` (python:3.12-slim + torch CPU, веса внутри, 3 ГБ), `dxaqc run`/`dxaqc serve` — проверен на arm64; сборка amd64 для организатора идёт
+- 🔑 numpy 2: `ndarray.ptp()` убран (на vps/в Docker numpy 2.5) — иначе позвоночник падал в Failure
 - Разметка ориентиров завершена 23.09: 252/252 (Александр 235, Андрей 27). Разметчик LIVE: https://docsemenov.ru/razmetka/ (`tools/labeler/DEPLOY.md`)
 ## Дальше по очереди
 1. Docker CPU+CUDA с `docker save` (#16–18); прототип для формы сдачи: API + стенд на vps + скринкаст (#20)

@@ -8,6 +8,8 @@ GET  /api/runs/{run_id}/results.xlsx | results.csv           → файлы оф
 GET  /api/runs/{run_id}/overlay/{n}.png                       → снимок n с ориентирами и вердиктом
 GET  /health                                                  → {"status": "ok", "model": ..., "version": ...}
 Прогоны живут в RUNS_DIR (по умолчанию временная папка) не дольше RUN_TTL_MIN минут.
+За обратным прокси с префиксом (nginx: location /dxa/ → 127.0.0.1:8878/) запускать `uvicorn ... --root-path /dxa`:
+страница ходит по относительным ссылкам, Swagger берёт префикс из root_path.
 """
 from __future__ import annotations
 
@@ -35,7 +37,7 @@ RUN_TTL_MIN = int(os.environ.get("DXAQC_RUN_TTL_MIN", "180"))
 MAX_UPLOAD_MB = int(os.environ.get("DXAQC_MAX_UPLOAD_MB", "500"))
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
-app = FastAPI(title="DXA quality control", version=__version__, root_path=os.environ.get("DXAQC_ROOT_PATH", ""),
+app = FastAPI(title="DXA quality control", version=__version__,
               description="Контроль качества денситометрии: область → нарушение → тип (ЛЦТ-2026, задача №4)")
 _predictor = None
 _lock = threading.Lock()

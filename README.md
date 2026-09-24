@@ -22,7 +22,7 @@ docker run --rm -v "$PWD/in:/in" -v "$PWD/out:/out" dxaqc run -i /in -o /out   #
 
 API: `POST /api/analyze` (multipart `files` — .dcm или .zip) → JSON с `results` в официальном формате и ссылками на
 `results.xlsx`/`results.csv`; `GET /api/runs/{id}/overlay/{n}.png` — снимок с ориентирами и вердиктом; `GET /health`.
-За обратным прокси с префиксом — `DXAQC_ROOT_PATH=/dxa`.
+За обратным прокси с префиксом — `uvicorn dxaqc.api:app --root-path /dxa`.
 
 ## Веса модели
 
