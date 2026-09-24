@@ -101,12 +101,17 @@ def load_default_predictor(device: str | None = None) -> Predictor:
     return NullPredictor()
 
 
+REVIEW_BAND = 0.10                                   # |p − порог| < 0,10 → сомнительно, показать врачу
+
+
 @dataclass
 class Verdict:
     quality_class: int
     violation_type: str
     quality_prob: float
     flag_probs: dict[str, float] = field(default_factory=dict)
+    needs_review: bool = False                        # хотя бы один критерий у порога: решение стоит проверить глазами
+    review_flags: list[str] = field(default_factory=list)
 
 
 def aggregate(flag_probs: dict[str, float], thresholds: dict[str, float] | None = None) -> Verdict:
@@ -121,9 +126,12 @@ def aggregate(flag_probs: dict[str, float], thresholds: dict[str, float] | None 
     prob = 1.0 - float(np.prod([1.0 - min(max(p, 0.0), 1.0) for p in flag_probs.values()])) if flag_probs else 0.0
     if any(positive.values()):                       # порог пройден → вероятность не ниже 0,5, чтобы класс и prob не спорили
         prob = max(prob, 0.5)
+    near = [f for f, p in flag_probs.items() if abs(p - thresholds.get(f, DEFAULT_THRESHOLD)) < REVIEW_BAND]
     return Verdict(
         quality_class=int(any(positive.values())),
         violation_type=violation_string(positive),
         quality_prob=round(min(max(prob, 0.0), 1.0), 4),
         flag_probs=dict(flag_probs),
+        needs_review=bool(near),
+        review_flags=near,
     )

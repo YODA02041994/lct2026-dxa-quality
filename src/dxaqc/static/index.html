@@ -96,11 +96,12 @@ function render(j){
   $('#dl-xlsx').href=s.xlsx; $('#dl-csv').href=s.csv; $('#dl-xlsx').style.display=$('#dl-csv').style.display='inline';
   const rows=j.rows.map(r=>{
     const st=r.processing_status!=='Success'?'fail':(r.quality_class?'bad':'ok');
+    const rev=r.details&&r.details.needs_review?`<span class="pill fail" title="критерий у порога: ${(r.details.review_flags||[]).map(k=>SHORT[k]||k).join(', ')}">проверить</span> `:'';
     const crit=r.details?Object.entries(r.details.probs).map(([k,v])=>`<span class="${r.violation_type&&v>=0.5?'hit':''}">${SHORT[k]||k} ${v.toFixed(2)}</span>`).join(''):'';
     const p=r.quality_prob!=null?Number(r.quality_prob):0;
     return `<tr class="${st}"><td>${r.n+1}</td><td>${esc(r.path_to_study)}${r.duplicate_of?`<div class="muted">дубликат ${esc(r.duplicate_of)}</div>`:''}</td>
       <td>${esc(r.anatomical_region||'')}${r.side?` (${r.side})`:''}</td>
-      <td>${st==='fail'?`<span class="pill fail">Failure</span><div class="muted">${esc(r.error_message||'')}</div>`:(r.quality_class?`<span class="pill bad">нарушение</span>`:`<span class="pill ok">норма</span>`)}</td>
+      <td>${st==='fail'?`<span class="pill fail">Failure</span><div class="muted">${esc(r.error_message||'')}</div>`:(r.quality_class?`<span class="pill bad">нарушение</span>`:`<span class="pill ok">норма</span>`)+' '+rev}</td>
       <td>${esc(r.violation_type||'')}</td>
       <td>${st==='fail'?'':`${p.toFixed(2)}<span class="bar"><i style="width:${Math.round(p*100)}%"></i></span>`}<div class="crit">${crit}</div></td>
       <td>${st==='fail'?'':`<a class="lnk" onclick="show('${j.run_id}',${r.n})">снимок</a>`}</td></tr>`;}).join('');
