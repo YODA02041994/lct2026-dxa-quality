@@ -63,7 +63,12 @@ def to_input(img: np.ndarray, M: np.ndarray, rng: np.random.Generator | None = N
     return (x3 - MEAN[:, None, None]) / STD[:, None, None]
 
 
-CROP_LM = {"lt": ["lt_tip", "neck_inf", "shaft_top", "lt_up", "lt_down"]}
+CROP_LM = {
+    "lt": ["lt_tip", "neck_inf", "shaft_top", "lt_up", "lt_down"],          # малый вертел и основание шейки (ротация)
+    "neck": ["head", "neck_sup", "neck_inf", "gt_top"],                      # головка–шейка–большой вертел (укорочение шейки при ротации)
+    "prox": ["head", "gt_top", "gt_lat", "neck_sup", "neck_inf", "lt_tip", "shaft_top"],   # весь проксимальный отдел
+    "isch": ["ischium", "lt_down", "lt_tip"],                                # седалищная кость и низ вертела (поворот таза, приведение)
+}
 
 
 def crop_around(img: np.ndarray, lm: dict, names: list[str], half: int, mirrored: bool = False) -> np.ndarray:
@@ -111,6 +116,7 @@ class CnnScorer:
         self.kind, self.criterion, self.size = ck["kind"], ck["criterion"], ck.get("size", SIZE)
         self.arch = ck.get("arch", "resnet18")
         self.crop, self.half = ck.get("crop"), int(ck.get("half", 0))     # режим вырезки вокруг ориентиров
+        self.tta = int(ck.get("tta", 1))                                   # варианты сдвига/масштаба при предсказании
         self.nets = []
         for sd in ck.get("state_dicts") or [ck["state_dict"]]:
             n = make_net(pretrained=False, arch=self.arch)
@@ -127,5 +133,12 @@ class CnnScorer:
                 return 0.0
             img = crop_around(img, lm, CROP_LM[self.crop], self.half, mirrored)
         h, w = img.shape
-        x = torch.from_numpy(to_input(img, letterbox_matrix(h, w, self.size), size=self.size))[None].to(self.device)
-        return float(np.mean([torch.sigmoid(n(x))[0, 0].item() for n in self.nets]))
+        M0 = letterbox_matrix(h, w, self.size)
+        mats = [M0]
+        for k in range(self.tta - 1):
+            s = 1.0 + 0.04 * (1 if k % 2 == 0 else -1) * (1 + k // 2)
+            M = M0.copy(); M[0, 0] *= s; M[1, 1] *= s
+            M[0, 2] += 0.03 * self.size * ((k % 4) - 1.5); M[1, 2] += 0.03 * self.size * (((k + 1) % 4) - 1.5)
+            mats.append(M)
+        xs = torch.from_numpy(np.stack([to_input(img, M, size=self.size) for M in mats])).to(self.device)
+        return float(np.mean([torch.sigmoid(n(xs))[:, 0].mean().item() for n in self.nets]))
