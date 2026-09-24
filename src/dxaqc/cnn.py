@@ -5,6 +5,8 @@
 """
 from __future__ import annotations
 
+import os
+
 import cv2
 import numpy as np
 import torch
@@ -158,7 +160,11 @@ class CnnScorer:
         self.crop, self.half = ck.get("crop"), int(ck.get("half", 0))     # режим вырезки вокруг ориентиров
         self.tta = int(ck.get("tta", 1))                                   # варианты сдвига/масштаба при предсказании
         self.nets = []
-        for sd in ck.get("state_dicts") or [ck["state_dict"]]:
+        sds = ck.get("state_dicts") or [ck["state_dict"]]
+        limit = int(os.environ.get("DXAQC_NETS_PER_FILE", "0"))    # экономный режим (слабый сервер): взять только первые N сетей из файла
+        if limit > 0:
+            sds = sds[:limit]
+        for sd in sds:
             n = make_net(pretrained=False, arch=self.arch)
             n.load_state_dict({k: v.float() for k, v in sd.items()})
             self.nets.append(n.to(self.device).eval())

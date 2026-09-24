@@ -23,6 +23,7 @@ docker run --rm -v "$PWD/in:/in" -v "$PWD/out:/out" dxaqc run -i /in -o /out   #
 API: `POST /api/analyze` (multipart `files` — .dcm или .zip) → JSON с `results` в официальном формате и ссылками на
 `results.xlsx`/`results.csv`; `GET /api/runs/{id}/overlay/{n}.png` — снимок с ориентирами и вердиктом; `GET /health`.
 За обратным прокси с префиксом — `uvicorn dxaqc.api:app --root-path /dxa`.
+На слабом сервере (2 ядра, < 4 ГБ на процесс) — `DXAQC_NETS_PER_FILE=1`: из каждого файла весов берётся одна сеть вместо ансамбля из трёх (память ×3 меньше, скорость ×3 выше, качество чуть ниже); проверка организатором предполагается без этого флага.
 
 ## Веса модели
 
