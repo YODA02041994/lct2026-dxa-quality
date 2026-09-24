@@ -102,7 +102,7 @@ function render(j){
     return `<tr class="${st}"><td>${r.n+1}</td><td>${esc(r.path_to_study)}${r.duplicate_of?`<div class="muted">дубликат ${esc(r.duplicate_of)}</div>`:''}</td>
       <td>${esc(r.anatomical_region||'')}${r.side?` (${r.side})`:''}</td>
       <td>${st==='fail'?`<span class="pill fail">Failure</span><div class="muted">${esc(r.error_message||'')}</div>`:(r.quality_class?`<span class="pill bad">нарушение</span>`:`<span class="pill ok">норма</span>`)+' '+rev}</td>
-      <td>${esc(r.violation_type||'')}</td>
+      <td>${esc(r.violation_type||'')}${r.details&&r.details.comment?`<div class="muted" style="font-size:12px">${esc(r.details.comment)}</div>`:''}${r.details&&r.details.advice&&r.details.advice.length?`<div style="font-size:12px;color:var(--accent2)">→ ${esc(r.details.advice.join(' '))}</div>`:''}</td>
       <td>${st==='fail'?'':`${p.toFixed(2)}<span class="bar"><i style="width:${Math.round(p*100)}%"></i></span>`}<div class="crit">${crit}</div></td>
       <td>${st==='fail'?'':`<a class="lnk" onclick="show('${j.run_id}',${r.n})">снимок</a>`}</td></tr>`;}).join('');
   $('#tbl').innerHTML=`<table><thead><tr><th>#</th><th>файл</th><th>область</th><th>класс</th><th>тип нарушения</th><th>вероятность · критерии</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;

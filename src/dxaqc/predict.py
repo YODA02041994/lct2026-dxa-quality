@@ -86,7 +86,9 @@ class LandmarkPredictor(Predictor):
             cnn = {"cnn_hip_pos": self.cnn["cnn_hip_pos"].score(img, side, lm)} if "cnn_hip_pos" in self.cnn else {}
             feats = hip_features(lm, h, w, side, img, cnn)
         probs = self.crit.predict(feats, flags_for(region))
-        self._last = {"landmarks": lm, "features": feats, "probs": probs}
+        from .criteria import explain
+        comment, advice = explain(region, feats, probs, self.thresholds)
+        self._last = {"landmarks": lm, "features": feats, "probs": probs, "comment": comment, "advice": advice}
         return probs
 
     def explain(self) -> dict:

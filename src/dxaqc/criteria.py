@@ -15,7 +15,7 @@ import cv2
 
 import numpy as np
 
-from .labels import HIP_FLAGS, SPINE_FLAGS, pixel_mm
+from .labels import HIP_FLAGS, REGION_SPINE, SPINE_FLAGS, pixel_mm
 
 SPINE_FEATURES = ["axis_deg", "axis_ok", "n_levels", "L5_present", "th12_present", "crests", "crest_l", "crest_r",
                   "top_gap_cm", "bottom_gap_cm", "conf_min", "th12_conf", "crest_l_conf", "crest_r_conf", "crests_conf", "axis_img_deg", "cnn_artifact",
@@ -347,3 +347,34 @@ class CriteriaModel:
 
 SPINE_CRITERIA = list(SPINE_FLAGS)     # spine_positioning, spine_axis_tilt, spine_artifact
 HIP_CRITERIA = list(HIP_FLAGS)         # hip_positioning_rotation, hip_roi_field
+
+
+# ---------- объяснение для врача и совет лаборанту (текст по признакам, без ML) ----------
+ADVICE = {
+    "spine_positioning": "Сместить поле сканирования так, чтобы в кадр вошли гребни подвздошных костей снизу и Th12 с рёбрами сверху; проверить, что видны L1–L4 целиком.",
+    "spine_axis_tilt": "Выровнять пациента по средней линии стола: позвоночник должен идти вертикально по центру кадра.",
+    "spine_artifact": "Убрать металлические предметы и одежду с фурнитурой (пуговицы, молнии, цепочки); переснять.",
+    "hip_positioning_rotation": "Довернуть стопу внутрь на 15–25° и зафиксировать (малый вертел должен быть виден минимально), бедро — параллельно оси стола.",
+    "hip_roi_field": "Расширить поле: в кадре должны быть вся головка, большой вертел и не менее 2,5 см диафиза ниже малого вертела; латеральный край не срезать.",
+}
+
+
+def explain(region: str, f: dict, probs: dict, thresholds: dict) -> tuple[str, list[str]]:
+    """Короткий протокол измерений и советы по нарушенным критериям."""
+    parts, advice = [], []
+    if region == REGION_SPINE:
+        parts.append(f"ось {f.get('axis_img_deg', 0):.1f}°")
+        parts.append("гребни в кадре" if f.get("bottom_width", 0) >= 0.45 else "полоса таза внизу узкая — гребни, возможно, вне кадра")
+        parts.append(f"Th12 (уверенность {f.get('th12_conf', 0):.2f})")
+        if f.get("th_frac40", 0) > 0.003:
+            parts.append(f"тонкие яркие линии вне столба ({f.get('th_frac40', 0) * 100:.1f} % площади)")
+    else:
+        parts.append(f"диафиз {f.get('shaft_img_deg', 0):.1f}° к вертикали")
+        parts.append(f"запас до края: снизу {f.get('bottom_cm', 0):.1f} см, сверху {f.get('top_cm', 0):.1f} см, сбоку {f.get('lat_cm', 0):.1f} см")
+        parts.append(f"высота кадра {f.get('frame_h_cm', 0):.1f} см")
+        if "cnn_hip_pos" in f:
+            parts.append(f"ротация по вертелу (сеть) {f['cnn_hip_pos']:.2f}")
+    for c, p in probs.items():
+        if p >= thresholds.get(c, 0.5):
+            advice.append(ADVICE.get(c, ""))
+    return "; ".join(parts), [a for a in advice if a]
