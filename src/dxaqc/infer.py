@@ -216,8 +216,28 @@ def write_overlays(rows: list[dict], root: str, output_dir: str, thresholds: dic
     return n
 
 
+def write_sr(rows: list[dict], root: str, output_dir: str) -> int:
+    """DICOM SR с текстом заключения — по одному на успешный снимок (дубликаты получают свой SR со ссылкой на свой файл)."""
+    from .sr import build_sr
+    out = os.path.join(output_dir, "sr"); os.makedirs(out, exist_ok=True); n = 0
+    by_path = {r["path_to_study"]: r for r in rows}
+    for r in rows:
+        if r["processing_status"] != "Success":
+            continue
+        src_row = by_path.get(r["duplicate_of"], r) if r["duplicate_of"] else r
+        details = json.loads(src_row["details"]) if src_row["details"] else {}
+        try:
+            src = pydicom.dcmread(os.path.join(root, r["path_to_study"]), stop_before_pixels=True)
+            sr = build_sr(src, r, details)
+            sr.save_as(os.path.join(out, r["path_to_study"].replace(os.sep, "__").rsplit(".", 1)[0] + "_SR.dcm"), write_like_original=False)
+            n += 1
+        except Exception as exc:  # noqa: BLE001
+            log.warning("SR не записан %s — %s", r["path_to_study"], exc)
+    return n
+
+
 def run(input_path: str, output_dir: str, predictor: Predictor | None = None,
-        fmt: str = "both", overlays: bool = False) -> tuple[list[dict], RunSummary]:
+        fmt: str = "both", overlays: bool = False, sr: bool = False) -> tuple[list[dict], RunSummary]:
     predictor = predictor or load_default_predictor()
     if isinstance(predictor, NullPredictor):
         log.warning("веса модели не найдены — работает заглушка NullPredictor (нарушений нет)")
@@ -238,6 +258,8 @@ def run(input_path: str, output_dir: str, predictor: Predictor | None = None,
         rows = [process_file(p, root, predictor, cache) for p in _list_files(root)]
         if overlays:
             log.info("оверлеев записано: %d → %s", write_overlays(rows, root, output_dir, getattr(predictor, "thresholds", {})), os.path.join(output_dir, "overlays"))
+        if sr:
+            log.info("DICOM SR записано: %d → %s", write_sr(rows, root, output_dir), os.path.join(output_dir, "sr"))
     finally:
         if tmp:
             shutil.rmtree(tmp, ignore_errors=True)
