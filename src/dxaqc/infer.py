@@ -194,8 +194,30 @@ def write_csv(rows: list[dict], path: str) -> None:
         w.writerows(rows)
 
 
+def write_overlays(rows: list[dict], root: str, output_dir: str, thresholds: dict) -> int:
+    """Доп. серия: PNG с ориентирами, осью, рамками предметов и вердиктом — по одному на успешный уникальный снимок."""
+    from .viz import draw_overlay, encode_png
+    out = os.path.join(output_dir, "overlays"); os.makedirs(out, exist_ok=True); n = 0
+    by_path = {r["path_to_study"]: r for r in rows}
+    for r in rows:
+        if r["processing_status"] != "Success":
+            continue
+        src = by_path.get(r["duplicate_of"], r) if r["duplicate_of"] else r
+        details = json.loads(src["details"]) if src["details"] else {}
+        try:
+            img = _pixels(pydicom.dcmread(os.path.join(root, r["path_to_study"])))
+            bgr = draw_overlay(img, r["anatomical_region"], details, {"quality_class": r["quality_class"], "violation_type": r["violation_type"], "quality_prob": r[PROB_COLUMN]}, thresholds)
+            name = r["path_to_study"].replace(os.sep, "__").rsplit(".", 1)[0] + ".png"
+            with open(os.path.join(out, name), "wb") as f:
+                f.write(encode_png(bgr))
+            n += 1
+        except Exception as exc:  # noqa: BLE001
+            log.warning("оверлей не построен %s — %s", r["path_to_study"], exc)
+    return n
+
+
 def run(input_path: str, output_dir: str, predictor: Predictor | None = None,
-        fmt: str = "both") -> tuple[list[dict], RunSummary]:
+        fmt: str = "both", overlays: bool = False) -> tuple[list[dict], RunSummary]:
     predictor = predictor or load_default_predictor()
     if isinstance(predictor, NullPredictor):
         log.warning("веса модели не найдены — работает заглушка NullPredictor (нарушений нет)")
@@ -214,6 +236,8 @@ def run(input_path: str, output_dir: str, predictor: Predictor | None = None,
             raise FileNotFoundError(f"вход не найден или не папка/zip: {input_path}")
         cache: dict = {}
         rows = [process_file(p, root, predictor, cache) for p in _list_files(root)]
+        if overlays:
+            log.info("оверлеев записано: %d → %s", write_overlays(rows, root, output_dir, getattr(predictor, "thresholds", {})), os.path.join(output_dir, "overlays"))
     finally:
         if tmp:
             shutil.rmtree(tmp, ignore_errors=True)

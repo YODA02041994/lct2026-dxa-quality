@@ -1,5 +1,5 @@
 #!/bin/sh
-# dxaqc run -i /in -o /out [--format xlsx|csv|both]   — пакетная обработка
+# dxaqc run -i /in -o /out [--format xlsx|csv|both] [--overlays] [--mode sensitive]   — пакетная обработка
 # dxaqc serve [--port 8000]                            — HTTP-сервис (страница + Swagger)
 set -e
 cmd="${1:-serve}"; shift || true
