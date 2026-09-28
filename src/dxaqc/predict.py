@@ -144,7 +144,7 @@ def aggregate(flag_probs: dict[str, float], thresholds: dict[str, float] | None 
     quality_class = 1, если хотя бы один критерий не ниже своего порога (правило организатора: любое
     нарушение → снимок с нарушением). quality_prob — наибольшая из вероятностей критериев, приведённых
     к общей шкале (порог критерия = 0,5). Поэтому quality_prob ≥ 0,5 тогда и только тогда, когда quality_class = 1.
-    На снимках вне обучения это правило даёт ROC-AUC 0,858 против 0,849 у 1 − ∏(1 − p_i) (docs/08, эксп. 17).
+    На снимках вне обучения это правило даёт ROC-AUC 0,857 против 0,849 у 1 − ∏(1 − p_i) (docs/08, эксп. 17).
     """
     thresholds = thresholds or {}
     positive = {f: p >= thresholds.get(f, DEFAULT_THRESHOLD) for f, p in flag_probs.items()}
