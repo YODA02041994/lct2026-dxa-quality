@@ -103,7 +103,7 @@ ARCH = [  # имя, млн параметров, бедро (вырезка ма
     ("DenseNet121, рентгенограммы", 7.0, 0.860, None, OURS), ("EfficientNet-B0", 5.3, 0.804, 0.801, LIT), ("DenseNet121, ImageNet", 8.0, 0.815, None, LIT),
     ("ResNet18, ImageNet", 11.7, 0.824, 0.783, OURS), ("ResNet18, object-CXR", 11.7, None, 0.855, OURS),
     ("RegNetY-032", 17.9, 0.795, None, LIT), ("EfficientNetV2-S", 20.2, 0.819, 0.766, LIT), ("DINOv2 ViT-S/14", 22.1, 0.702, 0.649, LIT),
-    ("SE-ResNeXt50", 25.5, 0.807, None, LIT), ("ResNet50", 25.6, 0.821, 0.848, LIT), ("ConvNeXt-Tiny", 27.8, 0.802, None, LIT),
+    ("SE-ResNeXt50", 25.5, 0.807, None, LIT), ("ResNet50", 25.6, 0.821, 0.848, LIT), ("ConvNeXt-Tiny", 27.8, 0.802, 0.836, LIT),
 ]
 fig, ax = plt.subplots(1, 2, figsize=(12.8, 4.6), gridspec_kw={"wspace": 0.95})
 for axx, col, t, base in ((ax[0], 2, "Ротация бедра, вырезка малого вертела\n150 снимков, 36 с нарушением", 0.824),
