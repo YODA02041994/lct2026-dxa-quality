@@ -74,6 +74,6 @@ PYTHONPATH=src python scripts/threshold_report.py         # чувствител
 
 PatchCore, RAD-DINO, RadImageNet, атлас нормального бедра, индекс запирательного отверстия, мета-классификатор,
 признак контралатерального бедра, вырезка шейки, сети с входом 512 px для предметов, сети крупнее ResNet18
-(ResNet50, EfficientNetV2-S, SE-ResNeXt50, RegNetY-032, ConvNeXt-Tiny) и трансформер DINOv2 — цифры в `docs/08_Рисерч_что_ещё.md`.
+(ResNet50, EfficientNetV2-S, SE-ResNeXt50, RegNetY-032, ConvNeXt-Tiny) и трансформеры DINOv2 ViT-S и ViT-B — цифры в `docs/08_Рисерч_что_ещё.md`.
 
 Библиотеки `timm` и `torchxrayvision` нужны только для обучения и экспериментов. Сервис и контейнер используют torchvision.
