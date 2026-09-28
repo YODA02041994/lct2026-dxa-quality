@@ -153,3 +153,30 @@ def test_nonstandard_frame_width_gets_region_from_localizers(tmp_path):
         assert by[name]["anatomical_region"] == region
         assert json.loads(by[name]["details"])["region_by"] == "localizers"
     assert by["blank.dcm"]["processing_status"] == "Failure" and "unsupported_image" in by["blank.dcm"]["error_message"]
+
+
+@need_test
+@need_weights
+def test_16bit_inverted_frame_gives_same_verdict(tmp_path):
+    """16 бит и перевёрнутая шкала (MONOCHROME1) приводятся к шкале обучающих снимков: вердикт тот же."""
+    import pydicom
+    from dxaqc.predict import load_default_predictor
+    pred = load_default_predictor()
+    base, _ = run(TEST_DIR, str(tmp_path / "a"), predictor=pred)
+    src = tmp_path / "in"
+    src.mkdir()
+    for name in sorted(os.listdir(TEST_DIR)):
+        ds = pydicom.dcmread(os.path.join(TEST_DIR, name))
+        a = ds.pixel_array.astype(np.uint16)
+        a = (int(a.max()) - a) * 16                               # инверсия и 12-битная шкала
+        ds.PhotometricInterpretation = "MONOCHROME1"
+        ds.BitsAllocated, ds.BitsStored, ds.HighBit = 16, 12, 11
+        ds.PixelData = a.tobytes()
+        ds.save_as(str(src / name))
+    rows, s = run(str(src), str(tmp_path / "b"), predictor=pred)
+    assert s.failure == 0
+    ref = {r["path_to_study"]: r for r in base}
+    for r in rows:
+        o = ref[r["path_to_study"]]
+        assert (r["anatomical_region"], r["quality_class"], r["violation_type"]) == (o["anatomical_region"], o["quality_class"], o["violation_type"])
+        assert abs(float(r["quality_prob"]) - float(ref[r["path_to_study"]]["quality_prob"])) < 0.1

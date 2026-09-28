@@ -103,6 +103,12 @@ def _pixels(ds: pydicom.Dataset) -> np.ndarray:
         arr = arr[..., 0] if arr.shape[-1] in (3, 4) else arr[0]
     if arr.ndim != 2:
         raise ValueError(f"неожиданная размерность пикселей: {arr.shape}")
+    if str(getattr(ds, "PhotometricInterpretation", "")).upper() == "MONOCHROME1":      # кость тёмная → переворот шкалы
+        arr = arr.max() - arr
+    if arr.dtype != np.uint8:                                                            # 12–16 бит → шкала обучающих снимков (8 бит)
+        a = arr.astype(np.float32)
+        lo, hi = float(a.min()), float(np.percentile(a, 99.9))
+        arr = np.clip((a - lo) / max(hi - lo, 1e-6) * 255.0, 0, 255).astype(np.uint8)
     return arr
 
 
