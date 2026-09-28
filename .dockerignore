@@ -1,0 +1,12 @@
+.git
+.venv
+data
+docs
+experiments
+presentation
+tests
+tools
+**/__pycache__
+*.tar.gz
+in
+out
