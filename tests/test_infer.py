@@ -118,3 +118,38 @@ def test_train_row_per_file_duplicates_share_prediction_and_run_is_reproducible(
     for r in rows1:
         if r["duplicate_of"]:
             assert r["quality_prob"] == by_path[r["duplicate_of"]]["quality_prob"]
+
+
+WEIGHTS = os.path.join(ROOT, "weights")
+need_weights = pytest.mark.skipif(not os.path.exists(os.path.join(WEIGHTS, "landmarks_hip.pt")), reason="сначала scripts/download_weights.sh")
+
+
+@need_test
+@need_weights
+def test_nonstandard_frame_width_gets_region_from_localizers(tmp_path):
+    """Кадр нестандартной ширины: область определяют локализаторы; кадр без анатомии — Failure, пакет не падает."""
+    import json
+    import pydicom
+    from dxaqc.predict import load_default_predictor
+    src = tmp_path / "in"
+    src.mkdir()
+    expect = {}
+    for name in sorted(os.listdir(TEST_DIR)):
+        ds = pydicom.dcmread(os.path.join(TEST_DIR, name))
+        a = ds.pixel_array[:, 7:-6].copy()                      # ширина 300 → 287, 280 → 267: таких кадров в правиле ширины нет
+        expect[name] = REGION_SPINE if ds.Columns == 300 else REGION_HIP
+        ds.Rows, ds.Columns = a.shape
+        ds.PixelData = a.tobytes()
+        ds.save_as(str(src / name))
+    ds.Rows, ds.Columns = 200, 190                              # кадр без анатомии
+    ds.PixelData = np.zeros((200, 190), a.dtype).tobytes()
+    ds.SOPInstanceUID = pydicom.uid.generate_uid()
+    ds.save_as(str(src / "blank.dcm"))
+    rows, s = run(str(src), str(tmp_path / "out"), predictor=load_default_predictor())
+    by = {r["path_to_study"]: r for r in rows}
+    assert s.files == 4 and s.failure == 1
+    for name, region in expect.items():
+        assert by[name]["processing_status"] == "Success"
+        assert by[name]["anatomical_region"] == region
+        assert json.loads(by[name]["details"])["region_by"] == "localizers"
+    assert by["blank.dcm"]["processing_status"] == "Failure" and "unsupported_image" in by["blank.dcm"]["error_message"]
