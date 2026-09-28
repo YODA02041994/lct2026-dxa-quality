@@ -11,6 +11,7 @@
 | Экспертная разметка постановщика | 5 критериев, истина — колонки критериев | метки нарушений |
 | Разметка ориентиров командой | 252 снимка, 8 и 11 ориентиров, согласованность врачей 2,9 мм | обучение локализатора |
 | object-CXR (CC BY-NC 4.0) | 9000 рентгенограмм грудной клетки, половина с предметами | предобучение сетей по предметам |
+| Веса DenseNet121 TorchXRayVision (`densenet121-res224-all`) | сеть, обученная на открытых наборах рентгенограмм грудной клетки | исходные веса трёх сетей по укладке бедра |
 
 ```bash
 LCT_PASSWORD='…' scripts/download_data.sh && python scripts/unpack_data.py
@@ -40,10 +41,17 @@ PYTHONPATH=src python scripts/train_cnn_criterion.py --criterion hip_positioning
 PYTHONPATH=src python scripts/train_cnn_criterion.py --criterion hip_positioning_rotation --crop isch --half 50 --size 224 --tag isch100
 PYTHONPATH=src python scripts/train_cnn_criterion.py --criterion hip_positioning_rotation --crop prox --half 85 --size 288 --tag prox170
 PYTHONPATH=src python scripts/train_cnn_criterion.py --criterion hip_any --crop lt --half 50 --size 224 --tag any_lt100
+# три сети DenseNet121 с весами рентгенограмм грудной клетки (нужен пакет torchxrayvision: pip install torchxrayvision)
+X=xrv:densenet121-res224-all
+PYTHONPATH=src python scripts/train_cnn_criterion.py --criterion hip_positioning_rotation --crop lt --half 50 --size 224 --arch $X --lr 2e-4 --tag lt100_xrv
+PYTHONPATH=src python scripts/train_cnn_criterion.py --criterion hip_positioning_rotation --crop isch --half 50 --size 224 --arch $X --lr 2e-4 --tag isch100_xrv
+PYTHONPATH=src python scripts/train_cnn_criterion.py --criterion hip_positioning_rotation --crop prox --half 85 --size 288 --arch $X --lr 2e-4 --tag prox170_xrv
 
 # 4. логистические регрессии по критериям, пороги, отчёт
 PYTHONPATH=src python scripts/train_criteria.py           # → weights/criteria.json
+PYTHONPATH=src python scripts/make_modes.py               # режимы порогов competition и sensitive
 PYTHONPATH=src python scripts/make_report.py              # → docs/metrics.md
+PYTHONPATH=src python scripts/threshold_report.py         # чувствительность и специфичность при разных порогах
 ```
 
 Состав ансамблей задаётся в одном месте — `src/dxaqc/cnn.py: CNN_SOURCES`; его читают и обучение, и инференс.
@@ -65,4 +73,7 @@ PYTHONPATH=src python scripts/make_report.py              # → docs/metrics.md
 ## 5. Что проверено и отклонено
 
 PatchCore, RAD-DINO, RadImageNet, атлас нормального бедра, индекс запирательного отверстия, мета-классификатор,
-признак контралатерального бедра, вырезка шейки, сети с входом 512 px для предметов — цифры в `docs/08_Рисерч_что_ещё.md`.
+признак контралатерального бедра, вырезка шейки, сети с входом 512 px для предметов, сети крупнее ResNet18
+(ResNet50, EfficientNetV2-S, SE-ResNeXt50, RegNetY-032, ConvNeXt-Tiny) и трансформер DINOv2 — цифры в `docs/08_Рисерч_что_ещё.md`.
+
+Библиотеки `timm` и `torchxrayvision` нужны только для обучения и экспериментов. Сервис и контейнер используют torchvision.
