@@ -31,9 +31,15 @@ def test_aggregate_uses_official_wording_and_any_rule():
     v = aggregate({"spine_positioning": 0.1, "spine_axis_tilt": 0.9, "spine_artifact": 0.7})
     assert v.quality_class == 1
     assert v.violation_type == "Не выровнена ось позвоночника;Присутствуют посторонние предметы"
-    assert v.quality_prob == 0.973          # 1 − (1−0,1)(1−0,9)(1−0,7): два подозрительных критерия > одного
+    assert v.quality_prob == 0.9            # наибольшая вероятность критерия в шкале, где порог равен 0,5
     clean = aggregate({"hip_positioning_rotation": 0.2, "hip_roi_field": 0.1})
     assert (clean.quality_class, clean.violation_type) == (0, "")
+    assert clean.quality_prob < 0.5
+    # разные пороги: вероятность снимка не ниже 0,5 тогда и только тогда, когда сработал хотя бы один критерий
+    thr = {"hip_positioning_rotation": 0.53, "hip_roi_field": 0.89}
+    assert aggregate({"hip_positioning_rotation": 0.40, "hip_roi_field": 0.80}, thr).quality_prob < 0.5
+    hit = aggregate({"hip_positioning_rotation": 0.40, "hip_roi_field": 0.90}, thr)
+    assert hit.quality_class == 1 and hit.quality_prob >= 0.5
     assert set(v.violation_type.split(";")) <= set(VIOLATION_TEXT.values())
 
 

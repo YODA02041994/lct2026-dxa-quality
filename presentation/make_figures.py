@@ -36,14 +36,14 @@ save("data.png")
 
 # 3. сравнение вариантов модели
 fig, ax = plt.subplots(figsize=(12.2, 3.9))
-st = ["ориентиры +\nгеометрия\n+ 2 CNN", "+ признаки\nпо картинке", "+ ансамбль CNN\nи вырезки\n(бедро)", "+ предобучение\nна object-CXR", "+ яркость\nмягких тканей", "+ карта\nпредметов", "+ DenseNet121\nс рентгено-\nграмм"]
-auc = [0.737, 0.821, 0.822, 0.830, 0.841, 0.845, 0.849]; f1 = [0.583, 0.719, 0.727, 0.740, 0.752, 0.752, 0.762]; mf = [0.535, 0.610, 0.608, 0.627, 0.649, 0.649, 0.653]
+st = ["ориентиры +\nгеометрия\n+ 2 CNN", "+ признаки\nпо картинке", "+ ансамбль CNN\nи вырезки\n(бедро)", "+ предобучение\nна object-CXR", "+ яркость\nмягких тканей", "+ карта\nпредметов", "+ DenseNet121\nс рентгено-\nграмм", "+ общая\nшкала\nкритериев"]
+auc = [0.737, 0.821, 0.822, 0.830, 0.841, 0.845, 0.849, 0.857]; f1 = [0.583, 0.719, 0.727, 0.740, 0.752, 0.752, 0.762, 0.762]; mf = [0.535, 0.610, 0.608, 0.627, 0.649, 0.649, 0.653, 0.653]
 x = np.arange(len(st))
 for v, c, n in ((auc, OURS, "ROC-AUC"), (f1, LIT, "F1"), (mf, GREEN, "macro-F1 по 5 типам")):
     ax.plot(x, v, "-o", color=c, lw=2.5, ms=8, label=n)
     ax.text(x[-1] + 0.12, v[-1], f"{v[-1]:.2f}".replace(".", ","), color=c, va="center", fontsize=15, fontweight="bold")
     ax.text(x[0] - 0.12, v[0], f"{v[0]:.2f}".replace(".", ","), color=c, va="center", ha="right", fontsize=14)
-ax.set_xticks(x); ax.set_xticklabels(st, fontsize=11.5); ax.set_ylim(0.5, 0.9); ax.set_xlim(-0.6, 6.7); ax.legend(frameon=False, loc="lower right", fontsize=14, ncol=3)
+ax.set_xticks(x); ax.set_xticklabels(st, fontsize=11.5); ax.set_ylim(0.5, 0.9); ax.set_xlim(-0.6, 7.7); ax.legend(frameon=False, loc="lower right", fontsize=14, ncol=3)
 ax.set_ylabel("значение метрики")
 save("progress.png")
 
@@ -60,7 +60,7 @@ save("forest.png")
 # 5. бинарные метрики
 fig, ax = plt.subplots(figsize=(11.8, 3.9))
 m = ["ROC-AUC", "PR-AUC", "F1", "Accuracy", "Balanced accuracy", "Чувствительность", "Специфичность"]
-v = [0.849, 0.710, 0.762, 0.859, 0.835, 0.778, 0.893]; lo = [0.782, 0.587, 0.680, 0.820, 0.786, 0.690, 0.847]; hi = [0.906, 0.842, 0.832, 0.899, 0.884, 0.869, 0.935]
+v = [0.857, 0.718, 0.762, 0.859, 0.835, 0.778, 0.893]; lo = [0.802, 0.598, 0.680, 0.820, 0.786, 0.690, 0.847]; hi = [0.907, 0.843, 0.832, 0.899, 0.884, 0.869, 0.935]
 y = np.arange(len(m))[::-1]
 ax.errorbar(v, y, xerr=[np.array(v) - np.array(lo), np.array(hi) - np.array(v)], fmt="s", color=OURS, ecolor=OURS, elinewidth=2.5, capsize=5, ms=9)
 for yi, ai, l, h in zip(y, v, lo, hi): ax.text(1.01, yi, f"{ai:.3f} [{l:.3f}; {h:.3f}]".replace(".", ","), va="center", fontsize=14)
@@ -91,7 +91,7 @@ save("tried.png")
 
 # 8. порог
 fig, ax = plt.subplots(figsize=(11.6, 3.7))
-k = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.15, 1.3, 1.5]; sens = [0.93, 0.86, 0.82, 0.81, 0.79, 0.78, 0.61, 0.54, 0.49]; spec = [0.46, 0.59, 0.76, 0.81, 0.84, 0.89, 0.92, 0.93, 0.96]; fl = [0.65, 0.54, 0.41, 0.37, 0.35, 0.30, 0.24, 0.20, 0.17]; f1 = [0.570, 0.602, 0.678, 0.712, 0.722, 0.762, 0.672, 0.634, 0.614]
+k = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.15, 1.3, 1.5]; sens = [0.92, 0.86, 0.82, 0.81, 0.79, 0.78, 0.61, 0.53, 0.47]; spec = [0.47, 0.60, 0.76, 0.81, 0.85, 0.89, 0.92, 0.93, 0.96]; fl = [0.64, 0.53, 0.41, 0.37, 0.34, 0.30, 0.23, 0.20, 0.16]; f1 = [0.569, 0.605, 0.678, 0.712, 0.731, 0.762, 0.677, 0.623, 0.602]
 ax.plot(k, sens, "-o", color=OURS, lw=2.5, label="чувствительность"); ax.plot(k, spec, "-o", color=LIT, lw=2.5, label="специфичность")
 ax.plot(k, f1, "-s", color=GREEN, lw=2.5, label="F1"); ax.plot(k, fl, "--", color=NEUT, lw=2, label="доля помеченных снимков")
 ax.axvline(1.0, color="black", lw=1); ax.text(1.01, 0.12, "порог сдачи:\nмаксимум F1", fontsize=13, va="bottom")

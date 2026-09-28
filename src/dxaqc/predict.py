@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from dataclasses import dataclass, field
 
@@ -128,17 +129,27 @@ class Verdict:
     review_flags: list[str] = field(default_factory=list)
 
 
+def relative_prob(p: float, threshold: float) -> float:
+    """Вероятность критерия в шкале, где его порог равен 0,5: logit(p') = logit(p) − logit(порог).
+    Пороги критериев разные (0,48–0,89), поэтому без приведения критерий с высоким порогом завышал бы итог по снимку."""
+    p = min(max(float(p), 1e-6), 1.0 - 1e-6)
+    t = min(max(float(threshold), 1e-6), 1.0 - 1e-6)
+    z = math.log(p / (1.0 - p)) - math.log(t / (1.0 - t))
+    return 1.0 / (1.0 + math.exp(-z))
+
+
 def aggregate(flag_probs: dict[str, float], thresholds: dict[str, float] | None = None) -> Verdict:
     """Вероятности критериев → итог по снимку.
 
-    quality_class = 1, если хотя бы один критерий выше своего порога (правило организатора: любое
-    нарушение → снимок с нарушением). quality_prob = вероятность «есть хоть одно нарушение»:
-    1 − ∏(1 − p_i) — растёт с каждым подозрительным критерием, не раздувается от их числа.
+    quality_class = 1, если хотя бы один критерий не ниже своего порога (правило организатора: любое
+    нарушение → снимок с нарушением). quality_prob — наибольшая из вероятностей критериев, приведённых
+    к общей шкале (порог критерия = 0,5). Поэтому quality_prob ≥ 0,5 тогда и только тогда, когда quality_class = 1.
+    На снимках вне обучения это правило даёт ROC-AUC 0,858 против 0,849 у 1 − ∏(1 − p_i) (docs/08, эксп. 17).
     """
     thresholds = thresholds or {}
     positive = {f: p >= thresholds.get(f, DEFAULT_THRESHOLD) for f, p in flag_probs.items()}
-    prob = 1.0 - float(np.prod([1.0 - min(max(p, 0.0), 1.0) for p in flag_probs.values()])) if flag_probs else 0.0
-    if any(positive.values()):                       # порог пройден → вероятность не ниже 0,5, чтобы класс и prob не спорили
+    prob = max((relative_prob(p, thresholds.get(f, DEFAULT_THRESHOLD)) for f, p in flag_probs.items()), default=0.0)
+    if any(positive.values()):                       # защита от округления на самой границе порога
         prob = max(prob, 0.5)
     near = [f for f, p in flag_probs.items() if abs(p - thresholds.get(f, DEFAULT_THRESHOLD)) < REVIEW_BAND]
     return Verdict(

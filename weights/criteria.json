@@ -18,7 +18,7 @@
     0.10930989183082188,
     7.4866152698297945
    ],
-   "threshold": 0.7499999999999999
+   "threshold": 0.7599999999999999
   },
   "spine_axis_tilt": {
    "features": [
@@ -86,7 +86,7 @@
     8.801090594098191,
     0.21175623907213995
    ],
-   "threshold": 0.5299999999999999
+   "threshold": 0.5399999999999999
   },
   "hip_roi_field": {
    "features": [
@@ -106,7 +106,7 @@
     1.3466816438393059,
     2.3340189709867025
    ],
-   "threshold": 0.8899999999999999
+   "threshold": 0.8999999999999999
   }
  },
  "report": [
@@ -127,7 +127,7 @@
     0.99
    ],
    "f1_net": 0.667,
-   "thr": 0.7499999999999999
+   "thr": 0.7599999999999999
   },
   {
    "kind": "spine",
@@ -184,7 +184,7 @@
     0.94
    ],
    "f1_net": 0.753,
-   "thr": 0.5299999999999999
+   "thr": 0.5399999999999999
   },
   {
    "kind": "hip",
@@ -203,16 +203,16 @@
     0.998
    ],
    "f1_net": 0.667,
-   "thr": 0.8899999999999999
+   "thr": 0.8999999999999999
   }
  ],
  "modes": {
   "competition": {
-   "spine_positioning": 0.75,
+   "spine_positioning": 0.76,
    "spine_axis_tilt": 0.66,
    "spine_artifact": 0.48,
-   "hip_positioning_rotation": 0.53,
-   "hip_roi_field": 0.89
+   "hip_positioning_rotation": 0.54,
+   "hip_roi_field": 0.9
   },
   "sensitive": {
    "spine_positioning": 0.36,
