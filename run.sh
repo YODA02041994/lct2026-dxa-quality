@@ -43,7 +43,8 @@ case "$cmd" in
   save)
     ensure_image
     file="${1:-dxaqc.tar.gz}"
-    docker save "$IMAGE" | gzip > "$file"
+    case "$IMAGE" in *:*) ref="$IMAGE" ;; *) ref="$IMAGE:latest" ;; esac      # один тег, иначе в архив попадут все теги образа
+    docker save "$ref" | gzip > "$file"
     echo "образ сохранён: $file" ;;
   *) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//' ;;
 esac
