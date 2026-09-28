@@ -33,6 +33,10 @@ CNN_SOURCES = {
         "hip_positioning_rotation_isch100",                        # вырезка 100 px вокруг седалищной кости (0,83)
         "hip_positioning_rotation_prox170",                        # вырезка 170 px — весь проксимальный отдел (0,82)
         "hip_any_any_lt100",                                       # вырезка вертела на метке «любое нарушение» (0,85)
+        # эксп. 16: DenseNet121 с весами рентгенограмм грудной клетки (TorchXRayVision) → ансамбль OOF 0,88 → 0,89
+        "hip_positioning_rotation_lt100_xrv",                      # вырезка малого вертела (0,86)
+        "hip_positioning_rotation_isch100_xrv",                    # вырезка седалищной кости (0,84)
+        "hip_positioning_rotation_prox170_xrv",                    # проксимальный отдел (0,84)
     ],
 }
 

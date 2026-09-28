@@ -222,7 +222,9 @@ def main():
     out = cm.to_json()
     for c, m in models.items():
         out[c]["threshold"] = m["threshold"]
-    json.dump({"models": out, "report": report}, open(os.path.join(ROOT, "weights", "criteria.json"), "w"), ensure_ascii=False, indent=1)
+    path = os.path.join(ROOT, "weights", "criteria.json")
+    modes = json.load(open(path, encoding="utf-8")).get("modes") if os.path.exists(path) else None   # режимы порогов сохраняются, обновляет их make_modes.py
+    json.dump({"models": out, "report": report, **({"modes": modes} if modes else {})}, open(path, "w"), ensure_ascii=False, indent=1)
     json.dump(oof_all, open(os.path.join(WORK, "criteria_oof.json"), "w"), ensure_ascii=False)
     print("\nсохранено: weights/criteria.json")
 
