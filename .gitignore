@@ -22,3 +22,14 @@ weights/*.pth
 .DS_Store
 .idea/
 .vscode/
+
+# --- презентация: личные данные участников и файл на шаблоне организатора — вне git (PPTX лежит в Release)
+presentation/team.json
+presentation/*.pptx
+presentation/*.pdf
+presentation/_trimmed.pptx
+# картинки презентации со снимками организатора — вне git (собираются scripts/export_examples.py и gradcam_examples.py)
+presentation/img/cases.jpg
+presentation/img/gradcam.jpg
+presentation/img/ov_*.png
+presentation/img/ui.png

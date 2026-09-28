@@ -72,6 +72,11 @@ def make_net(pretrained: bool = True, arch: str = "resnet18", init: str | None =
         r = tm.convnext_tiny(weights=tm.ConvNeXt_Tiny_Weights.IMAGENET1K_V1 if pretrained else None); r.classifier[2] = nn.Linear(768, 1)
     elif arch == "efficientnet_b0":
         r = tm.efficientnet_b0(weights=tm.EfficientNet_B0_Weights.IMAGENET1K_V1 if pretrained else None); r.classifier[1] = nn.Linear(1280, 1)
+    elif arch.startswith("timm:"):                                  # любая сеть из timm: «timm:<имя>[@размер]» (ViT требует размер входа)
+        import timm
+        name, _, sz = arch[5:].partition("@")
+        kw = {"img_size": int(sz)} if sz else {}
+        r = timm.create_model(name, pretrained=pretrained, num_classes=1, **kw)
     else:
         raise ValueError(f"неизвестная архитектура {arch}")
     if init:

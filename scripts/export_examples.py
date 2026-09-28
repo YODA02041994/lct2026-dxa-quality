@@ -53,7 +53,7 @@ def render(iid, subdir, tag):
         p = (int(val["x"] * SCALE), int(val["y"] * SCALE)); cv2.circle(can, p, 4, (60, 220, 255), -1, cv2.LINE_AA)
     pil_img = Image.fromarray(cv2.cvtColor(can, cv2.COLOR_BGR2RGB))
     # --- рамка с русским текстом (PIL) ---
-    W = max(pil_img.width, 720); top, bottom = 118, 150
+    W = max(pil_img.width, 760); top, bottom = 118, 170
     page = Image.new("RGB", (W, top + pil_img.height + bottom), (250, 247, 242)); d = ImageDraw.Draw(page)
     bad = v.quality_class == 1
     d.rectangle([0, 0, W, top], fill=(201, 56, 42) if bad else (46, 139, 87))
@@ -64,7 +64,9 @@ def render(iid, subdir, tag):
     d.text((14, 78), f"Оценка эксперта организатора — {exp}   |   {tag}", font=f_b, fill="white")
     page.paste(pil_img, ((W - pil_img.width) // 2, top))
     y = top + pil_img.height + 10
-    d.text((14, y), "Протокол измерений: " + comment, font=f_s, fill=(31, 29, 26)); y += 22
+    for line in textwrap.wrap("Протокол измерений: " + comment, 115)[:2]:
+        d.text((14, y), line, font=f_s, fill=(31, 29, 26)); y += 19
+    y += 3
     for c, p in probs.items():
         d.text((14, y), f"  {VIOLATION_TEXT[c]}: {p:.2f} (порог {thr[c]:.2f}){'  ← сработал' if p >= thr[c] else ''}", font=f_s, fill=(201, 56, 42) if p >= thr[c] else (107, 102, 95)); y += 19
     if advice:

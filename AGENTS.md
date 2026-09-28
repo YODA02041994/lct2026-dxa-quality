@@ -14,7 +14,8 @@
 ## Жёсткие правила
 
 1. **Никаких данных организатора в git.** Не коммитить `data/`, `docs/materials/`, `docs/img/`, `docs/transcripts/`,
-   `docs/TZ_full.txt`, любые `.dcm`, `.zip`, `.xlsx`, `.pdf`, `.pptx`. Пароль к материалам не писать нигде
+   `docs/TZ_full.txt`, любые `.dcm`, `.zip`, `.xlsx`, `.pdf`, `.pptx`, картинки со снимками (презентация — в Release и на стенде).
+   Пароль к материалам не писать нигде
    (ни в коде, ни в issues, ни в коммитах). Данные качаются: `LCT_PASSWORD=… scripts/download_data.sh`.
 2. **Формат вывода — только официальный** (`src/dxaqc/labels.py`): `anatomical_region`, `violation_type`
    (текст через `;`, пусто при норме), `quality_prob`. Не переименовывать, не переводить.

@@ -69,15 +69,15 @@ def load(criterion: str, crop: str | None = None, half: int = 50):
 
 
 
-def train(items, idx, epochs, device, seed, rotate, arch="resnet18", size=SIZE, masks=True, init=None):
+def train(items, idx, epochs, device, seed, rotate, arch="resnet18", size=SIZE, masks=True, init=None, lr=3e-4):
     torch.manual_seed(seed)
     rng = np.random.default_rng(seed)
     net = make_net(arch=arch, init=init).to(device)
     pos = sum(items[i]["y"] for i in idx)
     pw = torch.tensor([(len(idx) - pos) / max(1, pos)], device=device)
-    opt = torch.optim.AdamW(net.parameters(), lr=3e-4, weight_decay=1e-3)
+    opt = torch.optim.AdamW(net.parameters(), lr=lr, weight_decay=1e-3)
     steps = epochs * max(1, int(np.ceil(len(idx) / 16)))
-    sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=3e-4, total_steps=steps, pct_start=0.2)
+    sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=lr, total_steps=steps, pct_start=0.2)
     net.train()
     for ep in range(epochs):
         order = rng.permutation(idx)
@@ -137,7 +137,9 @@ def main():
     ap.add_argument("--criterion", required=True)
     ap.add_argument("--epochs", type=int, default=25)
     ap.add_argument("--folds", type=int, default=5)
-    ap.add_argument("--arch", default="resnet18", choices=ARCHS)
+    ap.add_argument("--arch", default="resnet18", help="resnet18/34/50, efficientnet_b0, convnext_tiny или timm:<имя>[@размер]")
+    ap.add_argument("--lr", type=float, default=3e-4, help="макс. шаг обучения (для ViT — 5e-5)")
+    ap.add_argument("--device", default=None, help="cpu/mps/cuda (по умолчанию — лучшее доступное)")
     ap.add_argument("--size", type=int, default=SIZE)
     ap.add_argument("--tag", default="", help="суффикс имён выходных файлов (перебор вариантов, чтобы не затирать боевые веса)")
     ap.add_argument("--crop", default=None, choices=list(CROP_LM), help="вырезка вокруг ориентиров вместо всего кадра")
@@ -147,7 +149,7 @@ def main():
     ap.add_argument("--init", default=None, help="путь к весам RadImageNet ResNet50.pt (инициализация вместо ImageNet)")
     a = ap.parse_args()
     name = a.criterion + (f"_{a.tag}" if a.tag else "")
-    device = "mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu")
+    device = a.device or ("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
     kind, items = load(a.criterion, a.crop, a.half)
     y = np.array([it["y"] for it in items])
     groups = np.array([it["study"] for it in items])
@@ -155,7 +157,7 @@ def main():
     print(f"{a.criterion} [{a.arch} @ {a.size}px, {a.epochs} эп.]: снимков {len(items)}, нарушений {int(y.sum())} | {device} | повороты в аугментации: {'да' if rotate else 'нет'}")
     oof, sds, t0 = {}, [], time.time()
     for f, (tr, te) in enumerate(StratifiedGroupKFold(n_splits=a.folds, shuffle=True, random_state=a.seed).split(items, y, groups)):
-        net = train(items, tr, a.epochs, device, seed=f + 10 * a.seed, rotate=rotate, arch=a.arch, size=a.size, masks=(kind == "hip" and not a.crop), init=a.init)
+        net = train(items, tr, a.epochs, device, seed=f + 10 * a.seed, rotate=rotate, arch=a.arch, size=a.size, masks=(kind == "hip" and not a.crop), init=a.init, lr=a.lr)
         oof.update(predict(net, items, te, device, size=a.size, tta=a.tta))
         sds.append({k: v.detach().cpu().half() for k, v in net.state_dict().items()})
         yt = y[te]
@@ -165,7 +167,7 @@ def main():
     auc, ap_ = roc_auc_score(y, p), average_precision_score(y, p)
     print(f"=== OOF {a.criterion}: ROC-AUC {auc:.3f} | PR-AUC {ap_:.3f} (доля позитивов {y.mean():.2f})")
     json.dump(oof, open(os.path.join(WORK, f"cnn_oof_{name}.json"), "w"))
-    net = train(items, np.arange(len(items)), a.epochs, device, seed=42, rotate=rotate, arch=a.arch, size=a.size, masks=(kind == "hip" and not a.crop), init=a.init)
+    net = train(items, np.arange(len(items)), a.epochs, device, seed=42, rotate=rotate, arch=a.arch, size=a.size, masks=(kind == "hip" and not a.crop), init=a.init, lr=a.lr)
     final = {k: v.detach().cpu().half() for k, v in net.state_dict().items()}
     os.makedirs(os.path.join(ROOT, "weights"), exist_ok=True)
     path = os.path.join(ROOT, "weights", f"cnn_{name}.pt")
