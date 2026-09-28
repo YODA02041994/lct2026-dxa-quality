@@ -99,16 +99,17 @@ ax.axhline(0.29, color=NEUT, lw=0.8, ls=":"); ax.text(1.52, 0.29, "наруше�
 ax.set_xlabel("множитель порогов критериев (меньше — строже к пропускам)"); ax.set_ylim(0.1, 1.0); ax.set_xlim(0.45, 1.95); ax.legend(frameon=False, fontsize=13, loc="center right")
 save("tradeoff.png")
 # 9. архитектуры: число параметров и ROC-AUC вне обучения (эксп. 16); None — не обучалась на этой задаче
-ARCH = [  # имя, млн параметров, бедро (вырезка малого вертела, 150 снимков), предметы (позвоночник, 99 снимков), цвет
-    ("DenseNet121, рентгенограммы", 7.0, 0.860, None, OURS), ("EfficientNet-B0", 5.3, 0.804, 0.801, LIT), ("DenseNet121, ImageNet", 8.0, 0.815, None, LIT),
-    ("ResNet18, ImageNet", 11.7, 0.824, 0.783, OURS), ("ResNet18, object-CXR", 11.7, None, 0.855, OURS),
-    ("RegNetY-032", 17.9, 0.795, None, LIT), ("EfficientNetV2-S", 20.2, 0.819, 0.766, LIT), ("DINOv2 ViT-S/14", 22.1, 0.702, 0.649, LIT),
-    ("SE-ResNeXt50", 25.5, 0.807, None, LIT), ("ResNet50", 25.6, 0.821, 0.848, LIT), ("ConvNeXt-Tiny", 27.8, 0.802, 0.836, LIT),
+ARCH = [  # имя, млн параметров, бедро (вырезка малого вертела, 150 снимков), предметы (позвоночник, 99 снимков), цвет на каждой панели
+    ("DenseNet121, рентгенограммы", 7.0, 0.860, None, OURS, LIT), ("EfficientNet-B0", 5.3, 0.804, 0.801, LIT, LIT), ("DenseNet121, ImageNet", 8.0, 0.815, 0.762, LIT, LIT),
+    ("ResNet18, ImageNet", 11.7, 0.824, 0.783, OURS, LIT), ("ResNet18, object-CXR", 11.7, None, 0.855, OURS, OURS),
+    ("RegNetY-032", 17.9, 0.795, None, LIT, LIT), ("EfficientNetV2-S", 20.2, 0.819, 0.766, LIT, LIT), ("DINOv2 ViT-S/14", 22.1, 0.702, 0.649, LIT, LIT),
+    ("SE-ResNeXt50", 25.5, 0.807, None, LIT, LIT), ("ResNet50", 25.6, 0.821, 0.848, LIT, LIT), ("ConvNeXt-Tiny", 27.8, 0.802, 0.836, LIT, LIT),
+    ("DINOv2 ViT-B/14", 86.6, None, None, LIT, LIT),
 ]
-fig, ax = plt.subplots(1, 2, figsize=(12.8, 4.6), gridspec_kw={"wspace": 0.95})
-for axx, col, t, base in ((ax[0], 2, "Ротация бедра, вырезка малого вертела\n150 снимков, 36 с нарушением", 0.824),
-                          (ax[1], 3, "Посторонние предметы, позвоночник\n99 снимков, 17 с нарушением", 0.855)):
-    pts = sorted([(a[1], a[col], a[0], a[4]) for a in ARCH if a[col] is not None], key=lambda q: q[1])
+fig, ax = plt.subplots(1, 2, figsize=(12.8, 4.8), gridspec_kw={"wspace": 0.95})
+for axx, col, ccol, t, base in ((ax[0], 2, 4, "Ротация бедра, вырезка малого вертела\n150 снимков, 36 с нарушением", 0.824),
+                                (ax[1], 3, 5, "Посторонние предметы, позвоночник\n99 снимков, 17 с нарушением", 0.855)):
+    pts = sorted([(a[1], a[col], a[0], a[ccol]) for a in ARCH if a[col] is not None], key=lambda q: q[1])
     axx.axvline(base, color=OURS, lw=1.2, ls=":")
     for i, (par, auc, name, c) in enumerate(pts):
         axx.barh(i, auc - 0.5, left=0.5, color=c, height=0.62)
