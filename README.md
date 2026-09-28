@@ -85,7 +85,8 @@ docker/, Dockerfile, docker-compose.yml, requirements*.txt, requirements.lock
 | Диск | 5 ГБ (веса 0,9 ГБ; образ 2,8 ГБ, в архиве 1,4 ГБ) | 10 ГБ |
 | ОС | Linux с Docker 24+ | то же |
 
-Зависимости: Python 3.12, PyTorch 2.4 (CPU), torchvision, numpy, OpenCV, pydicom, scikit-learn, openpyxl, FastAPI, uvicorn.
+Зависимости: Python 3.12, PyTorch 2.4 (CPU), torchvision, numpy, OpenCV, pydicom, scikit-learn, openpyxl, FastAPI, uvicorn,
+декодеры сжатых DICOM (pylibjpeg, pylibjpeg-openjpeg, python-gdcm).
 Диапазоны версий — `requirements.txt` и `requirements-docker.txt`; точные версии проверенного образа — `requirements.lock`;
 базовый образ — `python:3.12-slim`.
 
@@ -224,6 +225,7 @@ Macro-F1 по 5 типам — 0,653. Журнал всех эксперимен
 | Файл не читается как DICOM, нет пикселей | строка с `processing_status = Failure`, причина в `error_message`; пакет продолжается |
 | Кадр нестандартной ширины | область определяют локализаторы ориентиров, в `details` пометка `region_by = localizers` |
 | Кадр без позвоночника и бедра (уверенность обоих локализаторов ниже 0,30) | `Failure`, `unsupported_image` |
+| Сжатый DICOM (RLE, JPEG Lossless, JPEG-LS, JPEG 2000) | читается, результат совпадает с несжатым файлом |
 | Снимок 12–16 бит или с перевёрнутой шкалой (MONOCHROME1) | приводится к шкале обучающих снимков (8 бит, кость светлая) |
 | Дубликат снимка в другой серии | своя строка, результат берётся от первого экземпляра, `duplicate_of` указывает на него |
 | Нет весов в `weights/` | сервис сообщает об этом в журнале и отвечает заглушкой «нарушений нет»; `/health` показывает `weights_loaded: false` |

@@ -180,3 +180,28 @@ def test_16bit_inverted_frame_gives_same_verdict(tmp_path):
         o = ref[r["path_to_study"]]
         assert (r["anatomical_region"], r["quality_class"], r["violation_type"]) == (o["anatomical_region"], o["quality_class"], o["violation_type"])
         assert abs(float(r["quality_prob"]) - float(ref[r["path_to_study"]]["quality_prob"])) < 0.1
+
+
+@need_test
+@need_weights
+def test_compressed_dicom_is_decoded(tmp_path):
+    """Сжатые DICOM (RLE, JPEG 2000 без потерь) читаются и дают тот же вердикт, что исходные файлы."""
+    import pydicom
+    from pydicom.uid import JPEG2000Lossless, RLELossless
+    from dxaqc.predict import load_default_predictor
+    pytest.importorskip("openjpeg")
+    pred = load_default_predictor()
+    base, _ = run(TEST_DIR, str(tmp_path / "a"), predictor=pred)
+    src = tmp_path / "in"
+    src.mkdir()
+    names = sorted(os.listdir(TEST_DIR))
+    for name, ts in zip(names, (RLELossless, JPEG2000Lossless, RLELossless)):
+        ds = pydicom.dcmread(os.path.join(TEST_DIR, name))
+        ds.compress(ts)
+        ds.save_as(str(src / name))
+    rows, s = run(str(src), str(tmp_path / "b"), predictor=pred)
+    assert s.failure == 0
+    ref = {r["path_to_study"]: r for r in base}
+    for r in rows:
+        o = ref[r["path_to_study"]]
+        assert (r["quality_class"], r["violation_type"], r["quality_prob"]) == (o["quality_class"], o["violation_type"], o["quality_prob"])
