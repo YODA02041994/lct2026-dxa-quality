@@ -59,12 +59,18 @@ def load_radimagenet(net: nn.Module, path: str) -> int:
 
 
 class XrvNet(nn.Module):
-    """DenseNet121 из torchxrayvision (эксп. 16): один канал, яркость в шкале [-1024; 1024]; голова — один логит."""
+    """DenseNet121 с одним входным каналом, предобученный на рентгенограммах грудной клетки (веса torchxrayvision, эксп. 16).
+    Сеть собирается из torchvision; библиотека torchxrayvision нужна только при обучении — взять исходные веса.
+    Яркость на входе — в шкале [-1024; 1024], как при предобучении; голова — один логит."""
 
     def __init__(self, weights: str | None):
         super().__init__()
-        import torchxrayvision as xrv
-        self.features = xrv.models.DenseNet(weights=weights).features
+        f = torchvision.models.densenet121(weights=None).features
+        f.conv0 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        if weights:
+            import torchxrayvision as xrv
+            f.load_state_dict(xrv.models.DenseNet(weights=weights).features.state_dict())
+        self.features = f
         self.fc = nn.Linear(1024, 1)
 
     def forward(self, x3: torch.Tensor) -> torch.Tensor:
