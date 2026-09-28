@@ -36,15 +36,19 @@
 
 ```bash
 git clone https://github.com/YODA02041994/lct2026-dxa-quality && cd lct2026-dxa-quality
-scripts/download_weights.sh                       # веса из GitHub Release → weights/ (нужен интернет, один раз)
-docker build -t dxaqc .                           # образ с весами внутри
-docker run --rm -v "$PWD/in:/in" -v "$PWD/out:/out" dxaqc run -i /in -o /out --overlays --sr
+./run.sh build                                    # веса из GitHub Release → weights/ и сборка образа (интернет нужен один раз)
+./run.sh batch in out --overlays --sr             # пакетная обработка папки или zip; контейнер работает без сети
+./run.sh serve                                    # веб-страница http://localhost:8000 и Swagger /docs
 ```
+
+То же без скрипта: `scripts/download_weights.sh && docker build -t dxaqc . &&
+docker run --rm -v "$PWD/in:/in" -v "$PWD/out:/out" dxaqc run -i /in -o /out --overlays --sr`.
 
 `in/` — папка с DICOM или zip-архивами исследований (любая вложенность), `out/` — результаты:
 `results.xlsx`, `results.csv`, `run.log`, `overlays/*.png`, `sr/*_SR.dcm`. Обработка идёт локально, без сети.
 
 Веб-страница и HTTP-сервис: `docker run --rm -p 8000:8000 dxaqc` → http://localhost:8000 (Swagger — `/docs`).
+Работающий прототип: https://docsemenov.ru/dxa/ · демонстрационный сценарий: [docs/DEMO.md](docs/DEMO.md).
 
 ## 3. Структура проекта
 
@@ -66,6 +70,7 @@ tests/            автотесты (pytest)
 docs/             разбор ТЗ, аудит данных, ответы постановщика, архитектура, журнал экспериментов, руководства
 presentation/     презентация (PDF), скрипты сборки и рисунки
 tools/labeler/    веб-инструмент разметки ориентиров, которым команда разметила 252 снимка
+run.sh            сборка и запуск контейнера одним скриптом
 docker/, Dockerfile, docker-compose.yml, requirements*.txt, requirements.lock
 ```
 
@@ -88,6 +93,17 @@ docker/, Dockerfile, docker-compose.yml, requirements*.txt, requirements.lock
 
 ## 5. Сборка и запуск контейнера
 
+Скрипт `run.sh` (Linux, macOS; нужен Docker 24+) выполняет сборку и запуск:
+
+| Команда | Действие |
+|---|---|
+| `./run.sh build` | скачивает веса, если их нет в `weights/`, и собирает образ `dxaqc` |
+| `./run.sh batch <вход> <выход> [флаги]` | пакетная обработка папки или zip-архива, контейнер запускается с `--network none` |
+| `./run.sh serve [порт]` | HTTP-сервис и веб-страница |
+| `./run.sh save [файл]` | выгрузка образа в архив для машины без интернета (`docker load < файл`) |
+
+Те же шаги вручную:
+
 ```bash
 scripts/download_weights.sh            # 15 файлов, 0,8 ГБ; тег по умолчанию v0.3.0, другой: TAG=… scripts/download_weights.sh
 docker build -t dxaqc .                # или: docker compose build
@@ -106,7 +122,7 @@ docker save dxaqc | gzip > dxaqc.tar.gz   # перенос образа на м�
 | `dxaqc serve [--port 8000]` | HTTP-сервис и веб-страница |
 
 Переменные окружения: `DXAQC_WEIGHTS` (папка весов), `DXAQC_MODE` (`competition`/`sensitive`), `DXAQC_NETS_PER_FILE=1`
-(экономный режим для слабого сервера: одна сеть из файла вместо ансамбля из трёх), `DXAQC_MAX_UPLOAD_MB`, `DXAQC_RUN_TTL_MIN`.
+(экономный режим для слабого сервера: одна сеть из файла вместо ансамбля из трёх), `DXAQC_MAX_UPLOAD_MB`, `DXAQC_RUN_TTL_MIN`, `DXAQC_FILES` (необязательная папка материалов, отдаётся по `/files/<имя>`).
 
 Запуск без контейнера: `pip install -r requirements.txt && PYTHONPATH=src python -m dxaqc run -i <вход> -o <выход>`.
 Подробно — [docs/DEPLOY.md](docs/DEPLOY.md).
@@ -119,6 +135,7 @@ docker save dxaqc | gzip > dxaqc.tar.gz   # перенос образа на м�
 | GET | `/api/runs/{run_id}/results.xlsx`, `.csv` | таблица официального формата |
 | GET | `/api/runs/{run_id}/overlay/{n}.png` | снимок `n` с ориентирами, осью, рамками предметов и вердиктом |
 | GET | `/health` | состояние сервиса, версия, загружены ли веса |
+| GET | `/files/{имя}` | материалы решения (презентация, демо-запись), если задана папка `DXAQC_FILES` |
 | GET | `/docs` | Swagger |
 
 ```bash
@@ -215,6 +232,7 @@ Macro-F1 по 5 типам — 0,649. Журнал всех эксперимен
 | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | руководство пользователя: веб-страница, таблица, разметка на снимке, режимы |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | руководство по развёртыванию: контейнер, сервер, обратный прокси, машина без интернета |
 | [docs/TRAINING.md](docs/TRAINING.md) | обучение и дообучение: данные, разметка, команды, проверка |
+| [docs/DEMO.md](docs/DEMO.md) | демонстрационный сценарий: 7 шагов с ожидаемым результатом, запись прохождения |
 | [docs/01_TZ_разбор.md](docs/01_TZ_разбор.md), [docs/03](docs/03_Вопросы_экспертам.md) | разбор ТЗ и ответы постановщика |
 | [docs/02_Данные_аудит.md](docs/02_Данные_аудит.md) | аудит данных |
 | [docs/05](docs/05_Эксперименты.md), [docs/08](docs/08_Рисерч_что_ещё.md), [docs/09](docs/09_Спорные_метки.md) | эксперименты, обзор методов, спорные метки |

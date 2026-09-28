@@ -36,6 +36,7 @@ RUNS_DIR = os.environ.get("DXAQC_RUNS", os.path.join(tempfile.gettempdir(), "dxa
 RUN_TTL_MIN = int(os.environ.get("DXAQC_RUN_TTL_MIN", "180"))
 MAX_UPLOAD_MB = int(os.environ.get("DXAQC_MAX_UPLOAD_MB", "500"))
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+FILES_DIR = os.environ.get("DXAQC_FILES", "")            # необязательная папка с материалами (презентация, демо-запись)
 
 app = FastAPI(title="DXA quality control", version=__version__,
               description="Контроль качества денситометрии: область → нарушение → тип (ЛЦТ-2026, задача №4)")
@@ -80,6 +81,15 @@ def health():
 def index():
     with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
         return f.read()
+
+
+@app.get("/files/{name}")
+def files(name: str):
+    """Материалы решения (презентация, демо-запись), если задана папка DXAQC_FILES."""
+    path = os.path.join(FILES_DIR, os.path.basename(name))
+    if not FILES_DIR or not os.path.isfile(path):
+        raise HTTPException(404)
+    return FileResponse(path, filename=os.path.basename(name))
 
 
 @app.post("/api/analyze")
