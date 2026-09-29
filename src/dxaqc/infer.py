@@ -204,9 +204,14 @@ def write_csv(rows: list[dict], path: str) -> None:
 
 
 def write_overlays(rows: list[dict], root: str, output_dir: str, thresholds: dict) -> int:
-    """Доп. серия: PNG с ориентирами, осью, рамками предметов и вердиктом — по одному на успешный уникальный снимок."""
+    """Доп. серия: снимок с ориентирами, осью, рамками предметов и вердиктом — на каждый успешно обработанный файл.
+    Два вида: PNG (overlays/) и DICOM Secondary Capture в том же исследовании (series/), одна серия на исследование."""
+    from pydicom.uid import generate_uid
+    from .sr import build_sc
     from .viz import draw_overlay, encode_png
     out = os.path.join(output_dir, "overlays"); os.makedirs(out, exist_ok=True); n = 0
+    out_sc = os.path.join(output_dir, "series"); os.makedirs(out_sc, exist_ok=True)
+    series: dict[str, tuple[str, int]] = {}                       # исследование → (SeriesInstanceUID, число снимков)
     by_path = {r["path_to_study"]: r for r in rows}
     for r in rows:
         if r["processing_status"] != "Success":
@@ -214,11 +219,16 @@ def write_overlays(rows: list[dict], root: str, output_dir: str, thresholds: dic
         src = by_path.get(r["duplicate_of"], r) if r["duplicate_of"] else r
         details = json.loads(src["details"]) if src["details"] else {}
         try:
-            img = _pixels(pydicom.dcmread(os.path.join(root, r["path_to_study"])))
+            ds = pydicom.dcmread(os.path.join(root, r["path_to_study"]))
+            img = _pixels(ds)
             bgr = draw_overlay(img, r["anatomical_region"], details, {"quality_class": r["quality_class"], "violation_type": r["violation_type"], "quality_prob": r[PROB_COLUMN]}, thresholds)
-            name = r["path_to_study"].replace(os.sep, "__").rsplit(".", 1)[0] + ".png"
-            with open(os.path.join(out, name), "wb") as f:
+            base = r["path_to_study"].replace(os.sep, "__").rsplit(".", 1)[0]
+            with open(os.path.join(out, base + ".png"), "wb") as f:
                 f.write(encode_png(bgr))
+            key = r["study_uid"] or r["study_dir"]
+            uid, k = series.get(key, (generate_uid(), 0))
+            series[key] = (uid, k + 1)
+            build_sc(ds, bgr, r, uid, k + 1).save_as(os.path.join(out_sc, base + "_SC.dcm"), write_like_original=False)
             n += 1
         except Exception as exc:  # noqa: BLE001
             log.warning("оверлей не построен %s — %s", r["path_to_study"], exc)
@@ -245,6 +255,17 @@ def write_sr(rows: list[dict], root: str, output_dir: str) -> int:
     return n
 
 
+def pack_series(output_dir: str) -> str:
+    """Zip-архив с дополнительными сериями (ТЗ п. 2.7): DICOM-серия с разметкой, DICOM SR и PNG."""
+    path = os.path.join(output_dir, "additional_series.zip")
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        for sub in ("series", "sr", "overlays"):
+            d = os.path.join(output_dir, sub)
+            for name in sorted(os.listdir(d)) if os.path.isdir(d) else []:
+                z.write(os.path.join(d, name), f"{sub}/{name}")
+    return path
+
+
 def run(input_path: str, output_dir: str, predictor: Predictor | None = None,
         fmt: str = "both", overlays: bool = False, sr: bool = False) -> tuple[list[dict], RunSummary]:
     predictor = predictor or load_default_predictor()
@@ -269,6 +290,8 @@ def run(input_path: str, output_dir: str, predictor: Predictor | None = None,
             log.info("оверлеев записано: %d → %s", write_overlays(rows, root, output_dir, getattr(predictor, "thresholds", {})), os.path.join(output_dir, "overlays"))
         if sr:
             log.info("DICOM SR записано: %d → %s", write_sr(rows, root, output_dir), os.path.join(output_dir, "sr"))
+        if overlays or sr:
+            log.info("архив дополнительных серий: %s", pack_series(output_dir))
     finally:
         if tmp:
             shutil.rmtree(tmp, ignore_errors=True)

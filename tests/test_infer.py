@@ -205,3 +205,25 @@ def test_compressed_dicom_is_decoded(tmp_path):
     for r in rows:
         o = ref[r["path_to_study"]]
         assert (r["quality_class"], r["violation_type"], r["quality_prob"]) == (o["quality_class"], o["violation_type"], o["quality_prob"])
+
+
+@need_test
+@need_weights
+def test_additional_series_dicom_and_zip(tmp_path):
+    """Дополнительная серия: DICOM Secondary Capture в том же исследовании, DICOM SR, PNG и общий zip-архив."""
+    import pydicom
+    from dxaqc.predict import load_default_predictor
+    rows, s = run(TEST_DIR, str(tmp_path / "out"), predictor=load_default_predictor(), overlays=True, sr=True)
+    out = tmp_path / "out"
+    sc = sorted(os.listdir(out / "series"))
+    assert len(sc) == s.success == len(os.listdir(out / "sr")) == len(os.listdir(out / "overlays"))
+    by_uid = {r["image_uid"]: r for r in rows}
+    for name in sc:
+        ds = pydicom.dcmread(str(out / "series" / name))
+        assert ds.SOPClassUID == "1.2.840.10008.5.1.4.1.1.7" and ds.PhotometricInterpretation == "RGB"
+        assert ds.pixel_array.shape == (ds.Rows, ds.Columns, 3)
+        src_uid = ds.DerivationDescription.split()[-1]
+        assert ds.StudyInstanceUID == by_uid[src_uid]["study_uid"]          # серия лежит в том же исследовании
+    with zipfile.ZipFile(str(out / "additional_series.zip")) as z:
+        names = z.namelist()
+    assert len(names) == 3 * s.success and {n.split("/")[0] for n in names} == {"series", "sr", "overlays"}

@@ -19,7 +19,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--input", "-i", required=True)
     r.add_argument("--output", "-o", required=True)
     r.add_argument("--format", choices=["xlsx", "csv", "both"], default="both")
-    r.add_argument("--overlays", action="store_true", help="записать доп. серию PNG с разметкой нарушений в <output>/overlays/")
+    r.add_argument("--overlays", action="store_true", help="записать доп. серию с разметкой нарушений: DICOM в <output>/series/, PNG в <output>/overlays/, всё вместе — additional_series.zip")
     r.add_argument("--sr", action="store_true", help="записать DICOM SR (Basic Text SR) с текстом заключения на каждый снимок в <output>/sr/")
     r.add_argument("--mode", choices=["competition", "sensitive"], default=None,
                    help="пороги: competition — максимум F1 (по умолчанию); sensitive — чувствительность ≥ 0,9 по критерию (клиника)")

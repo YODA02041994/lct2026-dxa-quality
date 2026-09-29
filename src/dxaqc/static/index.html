@@ -63,6 +63,7 @@
     <span style="flex:1"></span>
     <a class="ghost" id="dl-xlsx" style="display:none"><button class="ghost">results.xlsx</button></a>
     <a class="ghost" id="dl-csv" style="display:none"><button class="ghost">results.csv</button></a>
+    <a class="ghost" id="dl-zip" style="display:none"><button class="ghost">серии DICOM (zip)</button></a>
     <a href="docs" target="_blank"><button class="ghost">API (Swagger)</button></a>
   </div>
   <div id="err" class="err" style="display:none"></div>
@@ -94,6 +95,7 @@ function render(j){
   const s=j.summary;
   $('#stat').innerHTML=`<span>файлов <b>${s.files}</b></span><span>обработано <b>${s.success}</b></span><span>сбоев <b>${s.failure}</b></span><span>уникальных снимков <b>${s.unique_images}</b></span><span>время <b>${s.seconds} с</b></span>`;
   $('#dl-xlsx').href=s.xlsx; $('#dl-csv').href=s.csv; $('#dl-xlsx').style.display=$('#dl-csv').style.display='inline';
+  $('#dl-zip').href=s.xlsx.replace('results.xlsx','series.zip'); $('#dl-zip').style.display='inline';
   const rows=j.rows.map(r=>{
     const st=r.processing_status!=='Success'?'fail':(r.quality_class?'bad':'ok');
     const rev=r.details&&r.details.needs_review?`<span class="pill fail" title="критерий у порога: ${(r.details.review_flags||[]).map(k=>SHORT[k]||k).join(', ')}">проверить</span> `:'';

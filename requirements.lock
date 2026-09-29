@@ -1,3 +1,6 @@
+# Точные версии библиотек проверенного образа (pip freeze внутри контейнера, 28.09.2026).
+# torch==2.4.1 и torchvision==0.19.1 (сборка для CPU) ставятся в Dockerfile из индекса download.pytorch.org/whl/cpu.
+# Базовый образ: python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
 annotated-doc==0.0.5
 annotated-types==0.8.0
 anyio==4.15.1
@@ -32,8 +35,6 @@ setuptools==78.1.0
 starlette==1.7.0
 sympy==1.14.0
 threadpoolctl==3.7.0
-torch==2.4.1+cpu
-torchvision==0.19.1+cpu
 typing-inspection==0.4.4
 typing_extensions==4.16.0
 uvicorn==0.54.0

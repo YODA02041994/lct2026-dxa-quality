@@ -17,6 +17,9 @@ from pydicom.uid import ExplicitVRLittleEndian, generate_uid
 from . import __version__
 
 BASIC_TEXT_SR = "1.2.840.10008.5.1.4.1.1.88.11"
+SECONDARY_CAPTURE = "1.2.840.10008.5.1.4.1.1.7"
+COPY_TAGS = ("PatientName", "PatientID", "PatientBirthDate", "PatientSex", "StudyInstanceUID", "StudyID", "StudyDate", "StudyTime",
+             "AccessionNumber", "ReferringPhysicianName")
 
 
 def _code(value: str, scheme: str, meaning: str) -> Dataset:
@@ -70,5 +73,38 @@ def build_sr(src: pydicom.Dataset, row: dict, details: dict) -> pydicom.FileData
         _text("Objects", json.dumps(details.get("objects", []), ensure_ascii=False)),
     ]
     ds.ContentSequence = Sequence(items)
+    ds.is_little_endian, ds.is_implicit_VR = True, False
+    return ds
+
+
+def build_sc(src: pydicom.Dataset, bgr, row: dict, series_uid: str, instance: int = 1) -> pydicom.FileDataset:
+    """Дополнительная серия DICOM (Secondary Capture, RGB): снимок с ориентирами, осью, рамками предметов и вердиктом.
+    Серия кладётся в то же исследование (StudyInstanceUID исходного снимка), у серии свой SeriesInstanceUID."""
+    import numpy as np
+    now = dt.datetime.now()
+    rgb = np.ascontiguousarray(bgr[:, :, ::-1]).astype(np.uint8)
+    meta = FileMetaDataset()
+    meta.MediaStorageSOPClassUID, meta.MediaStorageSOPInstanceUID = SECONDARY_CAPTURE, generate_uid()
+    meta.TransferSyntaxUID = ExplicitVRLittleEndian
+    ds = pydicom.FileDataset(None, {}, file_meta=meta, preamble=b"\0" * 128)
+    ds.SpecificCharacterSet = "ISO_IR 192"
+    ds.SOPClassUID, ds.SOPInstanceUID = SECONDARY_CAPTURE, meta.MediaStorageSOPInstanceUID
+    ds.Modality, ds.ConversionType = "OT", "WSD"
+    ds.SeriesInstanceUID, ds.SeriesNumber, ds.InstanceNumber = series_uid, 998, int(instance)
+    for tag in COPY_TAGS:
+        if tag in src:
+            setattr(ds, tag, src.data_element(tag).value)
+    if "StudyInstanceUID" not in ds:
+        ds.StudyInstanceUID = generate_uid()
+    ds.ContentDate, ds.ContentTime = now.strftime("%Y%m%d"), now.strftime("%H%M%S")
+    ds.SeriesDescription = "DXA quality control overlay (dxaqc)"
+    verdict = "VIOLATION" if int(row.get("quality_class") or 0) == 1 else "OK"
+    ds.ImageComments = f"{verdict}; quality_prob={row.get('quality_prob')}; {row.get('violation_type') or ''}"[:1024]
+    ds.DerivationDescription = f"overlay of SOPInstanceUID {getattr(src, 'SOPInstanceUID', '')}"[:1024]
+    ds.Manufacturer, ds.ManufacturerModelName, ds.SoftwareVersions = "LCT-2026 team", "dxaqc", __version__
+    ds.Rows, ds.Columns = int(rgb.shape[0]), int(rgb.shape[1])
+    ds.SamplesPerPixel, ds.PhotometricInterpretation, ds.PlanarConfiguration = 3, "RGB", 0
+    ds.BitsAllocated, ds.BitsStored, ds.HighBit, ds.PixelRepresentation = 8, 8, 7, 0
+    ds.PixelData = rgb.tobytes()
     ds.is_little_endian, ds.is_implicit_VR = True, False
     return ds

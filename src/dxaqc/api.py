@@ -144,6 +144,22 @@ def results(run_id: str, ext: str):
     return FileResponse(p, filename=f"results.{ext}")
 
 
+@app.get("/api/runs/{run_id}/series.zip")
+def series_zip(run_id: str):
+    """Zip с дополнительными сериями прогона: DICOM-серия с разметкой (Secondary Capture), DICOM SR, PNG."""
+    from .infer import pack_series, write_overlays, write_sr
+    rows = _rows(run_id)
+    rdir = os.path.join(RUNS_DIR, run_id)
+    out = os.path.join(rdir, "output")
+    path = os.path.join(out, "additional_series.zip")
+    if not os.path.isfile(path):
+        with _lock:
+            write_overlays(rows, os.path.join(rdir, "input"), out, predictor().thresholds)
+            write_sr(rows, os.path.join(rdir, "input"), out)
+            pack_series(out)
+    return FileResponse(path, filename="additional_series.zip")
+
+
 @app.get("/api/runs/{run_id}/overlay/{n}.png")
 def overlay(run_id: str, n: int):
     rows = _rows(run_id)
