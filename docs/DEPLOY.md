@@ -65,7 +65,7 @@ location ^~ /dxa/ {
 ## 7. Проверка после установки
 
 ```bash
-python -m pytest -q                                           # 16 тестов
+python -m pytest -q                                           # 18 тестов
 docker run --rm -v "$PWD/data/work/test:/in" -v "$PWD/out:/out" dxaqc run -i /in -o /out    # 3 файла, 0 Failure
 ```
 

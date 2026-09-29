@@ -317,8 +317,8 @@ s, y = d.slide("Кейсы: посторонний предмет, неверн�
 d.pic(s, os.path.join(IMG, "cases.jpg"), y, max_w=d.CW, max_h=Inches(3.95))
 d.refs(s, "Собственные данные: снимки вне обучения; рядом с вердиктом — оценка эксперта постановщика; scripts/export_examples.py")
 
-s, y = d.slide("Лаборант получает вердикт, протокол измерений и совет по исправлению укладки", "Прототип")
-d.pic(s, os.path.join(IMG, "ui.png"), y, max_w=d.CW, max_h=Inches(3.95))
+s, y = d.slide("Лаборант получает вердикт и совет по укладке; врач подтверждает предложенные области измерения", "Прототип")
+d.pic(s, os.path.join(IMG, "ov_proto.png"), y + Inches(0.05), max_w=d.CW, max_h=Inches(3.85))
 d.refs(s, "Прототип: https://docsemenov.ru/dxa/ · описание API: https://docsemenov.ru/dxa/docs · дополнительный функционал ТЗ: серия DICOM, DICOM SR, "
           "веб-интерфейс, предложение разметки областей измерения с подтверждением специалистом")
 
