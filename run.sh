@@ -9,12 +9,14 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 IMAGE="${DXAQC_IMAGE:-dxaqc}"
+# Проверенная платформа — linux/amd64. На ARM-машине: DXAQC_PLATFORM=linux/amd64 ./run.sh build (образ работает через эмуляцию).
+PLAT=(); [ -n "${DXAQC_PLATFORM:-}" ] && PLAT=(--platform "$DXAQC_PLATFORM")
 
 build() {
   if [ ! -f "$ROOT/weights/criteria.json" ] || [ ! -f "$ROOT/weights/landmarks_hip.pt" ]; then
     "$ROOT/scripts/download_weights.sh"
   fi
-  docker build -t "$IMAGE" "$ROOT"
+  docker build ${PLAT[@]+"${PLAT[@]}"} -t "$IMAGE" "$ROOT"
 }
 
 ensure_image() { docker image inspect "$IMAGE" >/dev/null 2>&1 || build; }
@@ -30,16 +32,16 @@ case "$cmd" in
     [ -e "$in" ] || { echo "нет входа: $in" >&2; exit 2; }
     ensure_image
     if [ -d "$in" ]; then
-      docker run --rm --network none -v "$in:/in:ro" -v "$out:/out" "$IMAGE" run -i /in -o /out "$@"
+      docker run --rm ${PLAT[@]+"${PLAT[@]}"} --network none -v "$in:/in:ro" -v "$out:/out" "$IMAGE" run -i /in -o /out "$@"
     else
-      docker run --rm --network none -v "$(dirname "$in"):/in:ro" -v "$out:/out" "$IMAGE" run -i "/in/$(basename "$in")" -o /out "$@"
+      docker run --rm ${PLAT[@]+"${PLAT[@]}"} --network none -v "$(dirname "$in"):/in:ro" -v "$out:/out" "$IMAGE" run -i "/in/$(basename "$in")" -o /out "$@"
     fi
     echo "результаты: $out" ;;
   serve)
     ensure_image
     port="${1:-8000}"
     echo "страница: http://localhost:$port   Swagger: http://localhost:$port/docs"
-    docker run --rm -p "$port:8000" "$IMAGE" serve ;;
+    docker run --rm ${PLAT[@]+"${PLAT[@]}"} -p "$port:8000" "$IMAGE" serve ;;
   save)
     ensure_image
     file="${1:-dxaqc.tar.gz}"

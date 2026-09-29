@@ -53,11 +53,13 @@ git clone https://github.com/YODA02041994/lct2026-dxa-quality && cd lct2026-dxa-
 
 ```bash
 ./run.sh batch "Для теста.zip" out --overlays --sr
-ls out        # results.xlsx  results.csv  run.log  overlays/  sr/
+ls out        # results.xlsx  results.csv  run.log  series/  overlays/  sr/  additional_series.zip
 ```
 
-Контейнер запускается с `--network none`: снимки не покидают машину. В `out/overlays` — PNG с разметкой на каждый снимок,
-в `out/sr` — DICOM Basic Text SR с текстом заключения для загрузки в PACS, в `run.log` — журнал обработки.
+Контейнер запускается с `--network none`: снимки не покидают машину. В `out/series` — дополнительная серия DICOM (Secondary Capture)
+с разметкой, серия лежит в том же исследовании; в `out/overlays` — те же снимки в PNG,
+в `out/sr` — DICOM Basic Text SR с текстом заключения для загрузки в PACS, `additional_series.zip` — всё это одним архивом,
+в `run.log` — журнал обработки.
 
 ## Шаг 5. API
 
