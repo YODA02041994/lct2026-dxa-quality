@@ -4,14 +4,16 @@
 
 ```bash
 git clone https://github.com/YODA02041994/lct2026-dxa-quality && cd lct2026-dxa-quality
-scripts/download_weights.sh          # 15 файлов, 0,8 ГБ, нужен интернет; curl или авторизованный gh
+./run.sh build                       # то же одной командой: веса из Release и сборка образа
+# или по шагам:
+scripts/download_weights.sh          # 18 файлов, 0,9 ГБ, нужен интернет; curl или авторизованный gh
 docker build -t dxaqc .
 docker run --rm dxaqc python -c "from dxaqc.predict import load_default_predictor as l; print(l().name)"   # → landmarks
 docker run --rm -v "$PWD/in:/in" -v "$PWD/out:/out" dxaqc run -i /in -o /out
 docker run -d --name dxaqc -p 8000:8000 --restart unless-stopped dxaqc       # сервис
 ```
 
-Проверка: `curl http://localhost:8000/health` → `{"status":"ok","model":"landmarks","weights_loaded":true}`.
+Проверка: `curl http://localhost:8000/health` → `{"status":"ok","model":"landmarks","version":"1.0.0","weights_loaded":true}`.
 
 ## 2. Машина без интернета
 
@@ -62,7 +64,7 @@ location ^~ /dxa/ {
 ## 7. Проверка после установки
 
 ```bash
-python -m pytest -q                                           # 13 тестов
+python -m pytest -q                                           # 16 тестов
 docker run --rm -v "$PWD/data/work/test:/in" -v "$PWD/out:/out" dxaqc run -i /in -o /out    # 3 файла, 0 Failure
 ```
 

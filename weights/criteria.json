@@ -18,7 +18,7 @@
     0.10930989183082188,
     7.4866152698297945
    ],
-   "threshold": 0.7499999999999999
+   "threshold": 0.7599999999999999
   },
   "spine_axis_tilt": {
    "features": [
@@ -74,19 +74,19 @@
     "cnn_hip_pos"
    ],
    "coef": [
-    0.2746093317712171,
-    1.4354826292853893
+    0.2699083032909939,
+    1.4792329948671454
    ],
-   "intercept": -0.4004199024101042,
+   "intercept": -0.4180979018726348,
    "mean": [
     8.414022978119268,
-    0.20649207213364468
+    0.28108352487474375
    ],
    "std": [
     8.801090594098191,
-    0.2714498121348414
+    0.21175623907213995
    ],
-   "threshold": 0.49999999999999994
+   "threshold": 0.5399999999999999
   },
   "hip_roi_field": {
    "features": [
@@ -106,7 +106,7 @@
     1.3466816438393059,
     2.3340189709867025
    ],
-   "threshold": 0.8899999999999999
+   "threshold": 0.8999999999999999
   }
  },
  "report": [
@@ -127,7 +127,7 @@
     0.99
    ],
    "f1_net": 0.667,
-   "thr": 0.7499999999999999
+   "thr": 0.7599999999999999
   },
   {
    "kind": "spine",
@@ -172,19 +172,19 @@
    "criterion": "hip_positioning_rotation",
    "n": 150,
    "pos": 36,
-   "auc_human": 0.863,
+   "auc_human": 0.871,
    "ci_human": [
-    0.765,
-    0.939
+    0.781,
+    0.943
    ],
-   "auc_net_from_human": 0.865,
-   "auc_net": 0.866,
+   "auc_net_from_human": 0.87,
+   "auc_net": 0.873,
    "ci_net": [
-    0.773,
-    0.939
+    0.785,
+    0.94
    ],
-   "f1_net": 0.734,
-   "thr": 0.49999999999999994
+   "f1_net": 0.753,
+   "thr": 0.5399999999999999
   },
   {
    "kind": "hip",
@@ -203,22 +203,22 @@
     0.998
    ],
    "f1_net": 0.667,
-   "thr": 0.8899999999999999
+   "thr": 0.8999999999999999
   }
  ],
  "modes": {
   "competition": {
-   "spine_positioning": 0.75,
+   "spine_positioning": 0.76,
    "spine_axis_tilt": 0.66,
    "spine_artifact": 0.48,
-   "hip_positioning_rotation": 0.5,
-   "hip_roi_field": 0.89
+   "hip_positioning_rotation": 0.54,
+   "hip_roi_field": 0.9
   },
   "sensitive": {
    "spine_positioning": 0.36,
    "spine_axis_tilt": 0.35,
    "spine_artifact": 0.21,
-   "hip_positioning_rotation": 0.26,
+   "hip_positioning_rotation": 0.24,
    "hip_roi_field": 0.27
   },
   "note": "competition — пороги по максимуму F1 на OOF (сдача); sensitive — recall ≥ 0,9 по критерию для клиники, где пропуск дороже перепроверки"

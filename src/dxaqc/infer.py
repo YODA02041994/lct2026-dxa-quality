@@ -103,6 +103,12 @@ def _pixels(ds: pydicom.Dataset) -> np.ndarray:
         arr = arr[..., 0] if arr.shape[-1] in (3, 4) else arr[0]
     if arr.ndim != 2:
         raise ValueError(f"неожиданная размерность пикселей: {arr.shape}")
+    if str(getattr(ds, "PhotometricInterpretation", "")).upper() == "MONOCHROME1":      # кость тёмная → переворот шкалы
+        arr = arr.max() - arr
+    if arr.dtype != np.uint8:                                                            # 12–16 бит → шкала обучающих снимков (8 бит)
+        a = arr.astype(np.float32)
+        lo, hi = float(a.min()), float(np.percentile(a, 99.9))
+        arr = np.clip((a - lo) / max(hi - lo, 1e-6) * 255.0, 0, 255).astype(np.uint8)
     return arr
 
 
@@ -119,6 +125,9 @@ def process_file(path: str, root: str, predictor: Predictor, cache: dict) -> dic
         row["image_uid"] = str(getattr(ds, "SOPInstanceUID", "") or "")
         img = _pixels(ds)
         region = region_by_width(int(img.shape[1]))
+        region_by = "width"
+        if region is None and hasattr(predictor, "guess_region"):      # нестандартная ширина кадра: область по локализаторам
+            region, region_by = predictor.guess_region(img), "localizers"
         if region is None:
             raise ValueError(f"unsupported_image: кадр {img.shape[0]}×{img.shape[1]} не похож на "
                              f"позвоночник (300 px) или бедро (280/248 px)")
@@ -131,7 +140,7 @@ def process_file(path: str, root: str, predictor: Predictor, cache: dict) -> dic
             verdict = aggregate(predictor.predict_flags(img, region, side or None), predictor.thresholds)
             cache[h] = (verdict, side, rel)
         ex = predictor.explain() if row["duplicate_of"] == "" else {}
-        row["details"] = json.dumps({"probs": {k: round(v, 4) for k, v in verdict.flag_probs.items()},
+        row["details"] = json.dumps({"probs": {k: round(v, 4) for k, v in verdict.flag_probs.items()}, "region_by": region_by,
                                      "needs_review": verdict.needs_review, "review_flags": verdict.review_flags,
                                      "comment": ex.get("comment", ""), "advice": ex.get("advice", []), "objects": ex.get("objects", []),
                                      "landmarks": {k: [round(v["x"], 1), round(v["y"], 1), round(v.get("conf", 1), 2)] for k, v in ex.get("landmarks", {}).items() if v.get("present")},

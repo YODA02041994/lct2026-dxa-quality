@@ -7,3 +7,7 @@ scikit-learn>=1.4
 fastapi>=0.110
 uvicorn>=0.29
 python-multipart>=0.0.9
+# декодеры сжатых DICOM (JPEG Lossless, JPEG-LS, JPEG 2000); RLE читает сам pydicom
+pylibjpeg>=2.0
+pylibjpeg-openjpeg>=2.3
+python-gdcm>=3.0.24

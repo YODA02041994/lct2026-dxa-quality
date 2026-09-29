@@ -147,12 +147,15 @@ def ci(metric, y, p, groups, n=1000, seed=0):
 
 
 def best_f1(y, p):
-    best = (0.0, 0.5)
-    for t in np.linspace(0.05, 0.95, 91):
-        f = f1_score(y, p >= t, zero_division=0)
-        if f > best[0]:
-            best = (f, float(t))
-    return best
+    """Порог с наибольшим F1. Если наибольший F1 держится на отрезке порогов, берётся середина отрезка:
+    порог на краю отрезка первым ломается при малом сдвиге вероятностей на новых снимках."""
+    grid = np.linspace(0.05, 0.95, 91)
+    f = np.array([f1_score(y, p >= t, zero_division=0) for t in grid])
+    k = int(np.argmax(f))
+    e = k
+    while e + 1 < len(grid) and f[e + 1] >= f[k] - 1e-12:
+        e += 1
+    return float(f[k]), float(grid[(k + e) // 2])
 
 
 def main():
@@ -222,7 +225,9 @@ def main():
     out = cm.to_json()
     for c, m in models.items():
         out[c]["threshold"] = m["threshold"]
-    json.dump({"models": out, "report": report}, open(os.path.join(ROOT, "weights", "criteria.json"), "w"), ensure_ascii=False, indent=1)
+    path = os.path.join(ROOT, "weights", "criteria.json")
+    modes = json.load(open(path, encoding="utf-8")).get("modes") if os.path.exists(path) else None   # режимы порогов сохраняются, обновляет их make_modes.py
+    json.dump({"models": out, "report": report, **({"modes": modes} if modes else {})}, open(path, "w"), ensure_ascii=False, indent=1)
     json.dump(oof_all, open(os.path.join(WORK, "criteria_oof.json"), "w"), ensure_ascii=False)
     print("\nсохранено: weights/criteria.json")
 

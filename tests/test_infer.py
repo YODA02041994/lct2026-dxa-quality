@@ -31,9 +31,15 @@ def test_aggregate_uses_official_wording_and_any_rule():
     v = aggregate({"spine_positioning": 0.1, "spine_axis_tilt": 0.9, "spine_artifact": 0.7})
     assert v.quality_class == 1
     assert v.violation_type == "Не выровнена ось позвоночника;Присутствуют посторонние предметы"
-    assert v.quality_prob == 0.973          # 1 − (1−0,1)(1−0,9)(1−0,7): два подозрительных критерия > одного
+    assert v.quality_prob == 0.9            # наибольшая вероятность критерия в шкале, где порог равен 0,5
     clean = aggregate({"hip_positioning_rotation": 0.2, "hip_roi_field": 0.1})
     assert (clean.quality_class, clean.violation_type) == (0, "")
+    assert clean.quality_prob < 0.5
+    # разные пороги: вероятность снимка не ниже 0,5 тогда и только тогда, когда сработал хотя бы один критерий
+    thr = {"hip_positioning_rotation": 0.53, "hip_roi_field": 0.89}
+    assert aggregate({"hip_positioning_rotation": 0.40, "hip_roi_field": 0.80}, thr).quality_prob < 0.5
+    hit = aggregate({"hip_positioning_rotation": 0.40, "hip_roi_field": 0.90}, thr)
+    assert hit.quality_class == 1 and hit.quality_prob >= 0.5
     assert set(v.violation_type.split(";")) <= set(VIOLATION_TEXT.values())
 
 
@@ -112,3 +118,90 @@ def test_train_row_per_file_duplicates_share_prediction_and_run_is_reproducible(
     for r in rows1:
         if r["duplicate_of"]:
             assert r["quality_prob"] == by_path[r["duplicate_of"]]["quality_prob"]
+
+
+WEIGHTS = os.path.join(ROOT, "weights")
+need_weights = pytest.mark.skipif(not os.path.exists(os.path.join(WEIGHTS, "landmarks_hip.pt")), reason="сначала scripts/download_weights.sh")
+
+
+@need_test
+@need_weights
+def test_nonstandard_frame_width_gets_region_from_localizers(tmp_path):
+    """Кадр нестандартной ширины: область определяют локализаторы; кадр без анатомии — Failure, пакет не падает."""
+    import json
+    import pydicom
+    from dxaqc.predict import load_default_predictor
+    src = tmp_path / "in"
+    src.mkdir()
+    expect = {}
+    for name in sorted(os.listdir(TEST_DIR)):
+        ds = pydicom.dcmread(os.path.join(TEST_DIR, name))
+        a = ds.pixel_array[:, 7:-6].copy()                      # ширина 300 → 287, 280 → 267: таких кадров в правиле ширины нет
+        expect[name] = REGION_SPINE if ds.Columns == 300 else REGION_HIP
+        ds.Rows, ds.Columns = a.shape
+        ds.PixelData = a.tobytes()
+        ds.save_as(str(src / name))
+    ds.Rows, ds.Columns = 200, 190                              # кадр без анатомии
+    ds.PixelData = np.zeros((200, 190), a.dtype).tobytes()
+    ds.SOPInstanceUID = pydicom.uid.generate_uid()
+    ds.save_as(str(src / "blank.dcm"))
+    rows, s = run(str(src), str(tmp_path / "out"), predictor=load_default_predictor())
+    by = {r["path_to_study"]: r for r in rows}
+    assert s.files == 4 and s.failure == 1
+    for name, region in expect.items():
+        assert by[name]["processing_status"] == "Success"
+        assert by[name]["anatomical_region"] == region
+        assert json.loads(by[name]["details"])["region_by"] == "localizers"
+    assert by["blank.dcm"]["processing_status"] == "Failure" and "unsupported_image" in by["blank.dcm"]["error_message"]
+
+
+@need_test
+@need_weights
+def test_16bit_inverted_frame_gives_same_verdict(tmp_path):
+    """16 бит и перевёрнутая шкала (MONOCHROME1) приводятся к шкале обучающих снимков: вердикт тот же."""
+    import pydicom
+    from dxaqc.predict import load_default_predictor
+    pred = load_default_predictor()
+    base, _ = run(TEST_DIR, str(tmp_path / "a"), predictor=pred)
+    src = tmp_path / "in"
+    src.mkdir()
+    for name in sorted(os.listdir(TEST_DIR)):
+        ds = pydicom.dcmread(os.path.join(TEST_DIR, name))
+        a = ds.pixel_array.astype(np.uint16)
+        a = (int(a.max()) - a) * 16                               # инверсия и 12-битная шкала
+        ds.PhotometricInterpretation = "MONOCHROME1"
+        ds.BitsAllocated, ds.BitsStored, ds.HighBit = 16, 12, 11
+        ds.PixelData = a.tobytes()
+        ds.save_as(str(src / name))
+    rows, s = run(str(src), str(tmp_path / "b"), predictor=pred)
+    assert s.failure == 0
+    ref = {r["path_to_study"]: r for r in base}
+    for r in rows:
+        o = ref[r["path_to_study"]]
+        assert (r["anatomical_region"], r["quality_class"], r["violation_type"]) == (o["anatomical_region"], o["quality_class"], o["violation_type"])
+        assert abs(float(r["quality_prob"]) - float(ref[r["path_to_study"]]["quality_prob"])) < 0.1
+
+
+@need_test
+@need_weights
+def test_compressed_dicom_is_decoded(tmp_path):
+    """Сжатые DICOM (RLE, JPEG 2000 без потерь) читаются и дают тот же вердикт, что исходные файлы."""
+    import pydicom
+    from pydicom.uid import JPEG2000Lossless, RLELossless
+    from dxaqc.predict import load_default_predictor
+    pytest.importorskip("openjpeg")
+    pred = load_default_predictor()
+    base, _ = run(TEST_DIR, str(tmp_path / "a"), predictor=pred)
+    src = tmp_path / "in"
+    src.mkdir()
+    names = sorted(os.listdir(TEST_DIR))
+    for name, ts in zip(names, (RLELossless, JPEG2000Lossless, RLELossless)):
+        ds = pydicom.dcmread(os.path.join(TEST_DIR, name))
+        ds.compress(ts)
+        ds.save_as(str(src / name))
+    rows, s = run(str(src), str(tmp_path / "b"), predictor=pred)
+    assert s.failure == 0
+    ref = {r["path_to_study"]: r for r in base}
+    for r in rows:
+        o = ref[r["path_to_study"]]
+        assert (r["quality_class"], r["violation_type"], r["quality_prob"]) == (o["quality_class"], o["violation_type"], o["quality_prob"])

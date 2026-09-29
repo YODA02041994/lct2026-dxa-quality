@@ -33,6 +33,10 @@ CNN_SOURCES = {
         "hip_positioning_rotation_isch100",                        # вырезка 100 px вокруг седалищной кости (0,83)
         "hip_positioning_rotation_prox170",                        # вырезка 170 px — весь проксимальный отдел (0,82)
         "hip_any_any_lt100",                                       # вырезка вертела на метке «любое нарушение» (0,85)
+        # эксп. 16: DenseNet121 с весами рентгенограмм грудной клетки (TorchXRayVision) → ансамбль OOF 0,88 → 0,89
+        "hip_positioning_rotation_lt100_xrv",                      # вырезка малого вертела (0,86)
+        "hip_positioning_rotation_isch100_xrv",                    # вырезка седалищной кости (0,84)
+        "hip_positioning_rotation_prox170_xrv",                    # проксимальный отдел (0,84)
     ],
 }
 
@@ -58,6 +62,27 @@ def load_radimagenet(net: nn.Module, path: str) -> int:
     return len(out) - len(unexpected)
 
 
+class XrvNet(nn.Module):
+    """DenseNet121 с одним входным каналом, предобученный на рентгенограммах грудной клетки (веса torchxrayvision, эксп. 16).
+    Сеть собирается из torchvision; библиотека torchxrayvision нужна только при обучении — взять исходные веса.
+    Яркость на входе — в шкале [-1024; 1024], как при предобучении; голова — один логит."""
+
+    def __init__(self, weights: str | None):
+        super().__init__()
+        f = torchvision.models.densenet121(weights=None).features
+        f.conv0 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        if weights:
+            import torchxrayvision as xrv
+            f.load_state_dict(xrv.models.DenseNet(weights=weights).features.state_dict())
+        self.features = f
+        self.fc = nn.Linear(1024, 1)
+
+    def forward(self, x3: torch.Tensor) -> torch.Tensor:
+        x = (x3[:, :1] * float(STD[0]) + float(MEAN[0])) * 2048.0 - 1024.0
+        f = torch.relu(self.features(x))
+        return self.fc(torch.flatten(nn.functional.adaptive_avg_pool2d(f, 1), 1))
+
+
 def make_net(pretrained: bool = True, arch: str = "resnet18", init: str | None = None) -> nn.Module:
     """Классификатор с одним выходом (логит нарушения). init — путь к весам RadImageNet (только resnet50):
     инициализация с радиологических изображений вместо ImageNet (эксп. 11)."""
@@ -77,6 +102,8 @@ def make_net(pretrained: bool = True, arch: str = "resnet18", init: str | None =
         name, _, sz = arch[5:].partition("@")
         kw = {"img_size": int(sz)} if sz else {}
         r = timm.create_model(name, pretrained=pretrained, num_classes=1, **kw)
+    elif arch.startswith("xrv:"):                                   # torchxrayvision: DenseNet121, предобученный на рентгенограммах грудной клетки
+        r = XrvNet(arch[4:] if pretrained else None)
     else:
         raise ValueError(f"неизвестная архитектура {arch}")
     if init:

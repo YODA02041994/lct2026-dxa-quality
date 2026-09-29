@@ -14,3 +14,7 @@ fastapi>=0.115
 uvicorn>=0.30
 python-multipart>=0.0.9
 pytest>=8.0
+# декодеры сжатых DICOM
+pylibjpeg>=2.0
+pylibjpeg-openjpeg>=2.3
+python-gdcm>=3.0.24
