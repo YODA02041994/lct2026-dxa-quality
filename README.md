@@ -4,7 +4,7 @@
 Департамента здравоохранения Москвы).
 
 Прототип: https://docsemenov.ru/dxa/ · описание API: https://docsemenov.ru/dxa/docs ·
-презентация: https://docsemenov.ru/dxa/files/DXA-QC_presentation.pdf · веса: [Releases](https://github.com/YODA02041994/lct2026-dxa-quality/releases)
+презентация: https://docsemenov.ru/dxa/files/DXA-QC_presentation.pdf · веса, готовый образ контейнера и запись работы: [Releases](https://github.com/YODA02041994/lct2026-dxa-quality/releases)
 
 ## 1. Назначение, возможности, ограничения
 
@@ -50,6 +50,14 @@ git clone https://github.com/YODA02041994/lct2026-dxa-quality && cd lct2026-dxa-
 
 То же без скрипта: `scripts/download_weights.sh && docker build -t dxaqc . &&
 docker run --rm -v "$PWD/in:/in" -v "$PWD/out:/out" dxaqc run -i /in -o /out --overlays --sr`.
+
+Без сборки: готовый образ linux/amd64 лежит в Release `v1.0.0-image` (архив 1,4 ГБ, рядом файл с контрольной суммой):
+
+```bash
+curl -LO https://github.com/YODA02041994/lct2026-dxa-quality/releases/download/v1.0.0-image/dxaqc_amd64.tar.gz
+gunzip -c dxaqc_amd64.tar.gz | docker load
+docker run --rm --network none -v "$PWD/in:/in" -v "$PWD/out:/out" dxaqc run -i /in -o /out --overlays --sr
+```
 
 `in/` — папка с DICOM или zip-архивами исследований (любая вложенность), `out/` — результаты:
 `results.xlsx`, `results.csv`, `run.log`, `series/*_SC.dcm`, `overlays/*.png`, `sr/*_SR.dcm`, `additional_series.zip`.
