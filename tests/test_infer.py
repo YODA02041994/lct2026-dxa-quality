@@ -227,3 +227,36 @@ def test_additional_series_dicom_and_zip(tmp_path):
     with zipfile.ZipFile(str(out / "additional_series.zip")) as z:
         names = z.namelist()
     assert len(names) == 3 * s.success and {n.split("/")[0] for n in names} == {"series", "sr", "overlays"}
+
+
+@need_test
+@need_weights
+def test_markup_proposal_for_measurement_regions(tmp_path):
+    """Предложение разметки: тела L1–L4 сверху вниз и шейка бедра внутри кадра; лист «разметка» в таблице."""
+    import json
+    import pydicom
+    from openpyxl import load_workbook
+    from dxaqc.infer import markup_rows, write_xlsx
+    from dxaqc.predict import load_default_predictor
+    rows, s = run(TEST_DIR, str(tmp_path / "out"), predictor=load_default_predictor(), fmt="xlsx")
+    seen = set()
+    for r in rows:
+        roi = json.loads(r["details"])["roi"]
+        ds = pydicom.dcmread(os.path.join(TEST_DIR, os.path.basename(r["path_to_study"])), stop_before_pixels=True)
+        for poly in roi.values():
+            assert len(poly) == 4 and all(0 <= x <= ds.Columns and 0 <= y <= ds.Rows for x, y in poly)
+        if r["anatomical_region"] == REGION_SPINE:
+            assert list(roi) == ["L1", "L2", "L3", "L4"]
+            ys = [np.mean([p[1] for p in roi[k]]) for k in roi]
+            assert ys == sorted(ys)
+        else:
+            assert list(roi) == ["neck"]
+        seen.update(roi)
+    assert seen == {"L1", "L2", "L3", "L4", "neck"}
+    wb = load_workbook(s.xlsx)
+    assert wb.sheetnames == ["results", "по исследованиям", "разметка"] and wb["разметка"].max_row == 1 + 4 + 2
+    first = rows[0]["path_to_study"]
+    out = markup_rows(rows, {first: {"status": "confirmed", "comment": ""}})
+    assert {r["status"] for r in out if r["path_to_study"] == first} == {"подтверждено специалистом"}
+    write_xlsx(rows, str(tmp_path / "r.xlsx"), {first: {"status": "rejected", "comment": "L4 ниже"}})
+    assert "отклонено специалистом: L4 ниже" in [c.value for c in load_workbook(str(tmp_path / "r.xlsx"))["разметка"]["E"]]

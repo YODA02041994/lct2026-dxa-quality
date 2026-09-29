@@ -1,0 +1,20 @@
+# Вариант образа для машины с видеокартой NVIDIA (CUDA 12.1). Код сам выбирает устройство: GPU, если он доступен, иначе CPU.
+#   docker build -f Dockerfile.cuda -t dxaqc:cuda .
+#   docker run --rm --gpus all --network none -v "$PWD/in:/in" -v "$PWD/out:/out" dxaqc:cuda run -i /in -o /out
+# Основной образ (Dockerfile) рассчитан на CPU и проверен; этот вариант отличается только сборкой PyTorch.
+FROM python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 \
+    OMP_NUM_THREADS=8 DXAQC_WEIGHTS=/app/weights PYTHONPATH=/app/src
+RUN apt-get update && apt-get install -y --no-install-recommends libglib2.0-0 libgl1 && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY requirements.lock ./
+RUN pip install --index-url https://download.pytorch.org/whl/cu121 torch==2.4.1 torchvision==0.19.1 \
+ && pip install -r requirements.lock
+COPY src ./src
+COPY weights ./weights
+COPY README.md ./
+COPY docker/entrypoint.sh /usr/local/bin/dxaqc
+RUN chmod +x /usr/local/bin/dxaqc
+EXPOSE 8000
+ENTRYPOINT ["dxaqc"]
+CMD ["serve"]

@@ -106,10 +106,19 @@ function render(j){
       <td>${st==='fail'?`<span class="pill fail">Failure</span><div class="muted">${esc(r.error_message||'')}</div>`:(r.quality_class?`<span class="pill bad">нарушение</span>`:`<span class="pill ok">норма</span>`)+' '+rev}</td>
       <td>${esc(r.violation_type||'')}${r.details&&r.details.comment?`<div class="muted" style="font-size:12px">${esc(r.details.comment)}</div>`:''}${r.details&&r.details.advice&&r.details.advice.length?`<div style="font-size:12px;color:var(--accent2)">→ ${esc(r.details.advice.join(' '))}</div>`:''}</td>
       <td>${st==='fail'?'':`${p.toFixed(2)}<span class="bar"><i style="width:${Math.round(p*100)}%"></i></span>`}<div class="crit">${crit}</div></td>
-      <td>${st==='fail'?'':`<a class="lnk" onclick="show('${j.run_id}',${r.n})">снимок</a>`}</td></tr>`;}).join('');
-  $('#tbl').innerHTML=`<table><thead><tr><th>#</th><th>файл</th><th>область</th><th>класс</th><th>тип нарушения</th><th>вероятность · критерии</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+      <td>${st==='fail'?'':`<a class="lnk" onclick="show('${j.run_id}',${r.n})">снимок</a>`}</td>
+      <td id="mk-${r.n}">${st!=='fail'&&r.details&&r.details.roi&&Object.keys(r.details.roi).length?`<div class="muted" style="font-size:12px">предложено: ${esc(Object.keys(r.details.roi).join(', '))}</div><a class="lnk" onclick="mark('${j.run_id}',${r.n},'confirmed')">подтвердить</a> · <a class="lnk" onclick="mark('${j.run_id}',${r.n},'rejected')">отклонить</a>`:'<span class="muted">—</span>'}</td></tr>`;}).join('');
+  $('#tbl').innerHTML=`<table><thead><tr><th>#</th><th>файл</th><th>область</th><th>класс</th><th>тип нарушения</th><th>вероятность · критерии</th><th></th><th>разметка областей измерения</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 function show(id,n){$('#modal-img').src=`api/runs/${id}/overlay/${n}.png?t=${Date.now()}`;$('#modal').classList.add('show');}
+async function mark(id,n,status){
+  const comment=status==='rejected'?(prompt('Что не так с разметкой? (необязательно)')||''):'';
+  try{
+    const r=await fetch(`api/runs/${id}/markup/${n}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status,comment})});
+    const j=await r.json(); if(!r.ok) throw new Error(j.detail||j.error||r.statusText);
+    document.getElementById('mk-'+n).innerHTML=status==='confirmed'?'<span class="pill ok">подтверждено</span>':'<span class="pill bad">отклонено</span>'+(comment?`<div class="muted" style="font-size:12px">${esc(comment)}</div>`:'');
+  }catch(e){alert('Не сохранено: '+e.message);}
+}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 </script>
 </body>

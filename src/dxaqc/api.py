@@ -23,7 +23,7 @@ import time
 import uuid
 
 import pydicom
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile, Body
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 
 from . import __version__
@@ -142,6 +142,35 @@ def results(run_id: str, ext: str):
     _rows(run_id)
     p = os.path.join(RUNS_DIR, run_id, "output", f"results.{ext}")
     return FileResponse(p, filename=f"results.{ext}")
+
+
+def _review(run_id: str) -> dict:
+    p = os.path.join(RUNS_DIR, run_id, "markup_review.json")
+    return json.load(open(p, encoding="utf-8")) if os.path.isfile(p) else {}
+
+
+@app.get("/api/runs/{run_id}/markup.json")
+def markup(run_id: str):
+    """Предложенная разметка областей измерения (тела L1–L4, шейка бедра) и решения специалиста по ней."""
+    from .infer import markup_rows
+    return {"run_id": run_id, "markup": markup_rows(_rows(run_id), _review(run_id))}
+
+
+@app.post("/api/runs/{run_id}/markup/{n}")
+def markup_review(run_id: str, n: int, payload: dict = Body(...)):
+    """Решение специалиста по предложенной разметке снимка n: {"status": "confirmed" | "rejected", "comment": "..."}.
+    Решение попадает на лист «разметка» таблицы results.xlsx этого прогона."""
+    from .infer import write_xlsx
+    rows = _rows(run_id)
+    status = str(payload.get("status", ""))
+    if n < 0 or n >= len(rows) or status not in ("confirmed", "rejected"):
+        raise HTTPException(422, "нужны номер снимка из прогона и status: confirmed или rejected")
+    with _lock:
+        rev = _review(run_id)
+        rev[rows[n]["path_to_study"]] = {"status": status, "comment": str(payload.get("comment") or "")[:300], "time": time.strftime("%Y-%m-%d %H:%M:%S")}
+        json.dump(rev, open(os.path.join(RUNS_DIR, run_id, "markup_review.json"), "w", encoding="utf-8"), ensure_ascii=False)
+        write_xlsx(rows, os.path.join(RUNS_DIR, run_id, "output", "results.xlsx"), rev)
+    return {"ok": True, "path_to_study": rows[n]["path_to_study"], "status": status}
 
 
 @app.get("/api/runs/{run_id}/series.zip")

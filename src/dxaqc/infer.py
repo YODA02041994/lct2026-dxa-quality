@@ -142,7 +142,7 @@ def process_file(path: str, root: str, predictor: Predictor, cache: dict) -> dic
         ex = predictor.explain() if row["duplicate_of"] == "" else {}
         row["details"] = json.dumps({"probs": {k: round(v, 4) for k, v in verdict.flag_probs.items()}, "region_by": region_by,
                                      "needs_review": verdict.needs_review, "review_flags": verdict.review_flags,
-                                     "comment": ex.get("comment", ""), "advice": ex.get("advice", []), "objects": ex.get("objects", []),
+                                     "comment": ex.get("comment", ""), "advice": ex.get("advice", []), "objects": ex.get("objects", []), "roi": ex.get("roi", {}),
                                      "landmarks": {k: [round(v["x"], 1), round(v["y"], 1), round(v.get("conf", 1), 2)] for k, v in ex.get("landmarks", {}).items() if v.get("present")},
                                      "features": {k: round(float(v), 2) for k, v in ex.get("features", {}).items()}}, ensure_ascii=False) if ex else ""
         row.update({"anatomical_region": region, "side": side, "quality_class": verdict.quality_class,
@@ -179,9 +179,30 @@ def study_summary(rows: list[dict]) -> list[dict]:
 
 
 SUMMARY_COLUMNS = ["study_dir", "files", "images", "failures", "violations", "needs_review", "regions_to_repeat", "advice"]
+MARKUP_COLUMNS = ["path_to_study", "anatomical_region", "roi", "polygon_px", "status"]
 
 
-def write_xlsx(rows: list[dict], path: str) -> None:
+def markup_rows(rows: list[dict], review: dict | None = None) -> list[dict]:
+    """Третий лист: предложенная разметка областей измерения (L1–L4, шейка бедра) и решение специалиста по ней.
+    review — {path_to_study: {"status": "confirmed" | "rejected", "comment": str}} из веб-интерфейса; в пакетном режиме пусто."""
+    by_path = {r["path_to_study"]: r for r in rows}
+    out = []
+    for r in rows:
+        if r["processing_status"] != "Success":
+            continue
+        src = by_path.get(r["duplicate_of"], r) if r["duplicate_of"] else r
+        roi = (json.loads(src["details"]) if src["details"] else {}).get("roi") or {}
+        st = (review or {}).get(r["path_to_study"], {})
+        status = {"confirmed": "подтверждено специалистом", "rejected": "отклонено специалистом"}.get(st.get("status"), "предложено, ждёт подтверждения")
+        if st.get("comment"):
+            status += f": {st['comment']}"
+        for name, poly in roi.items():
+            out.append({"path_to_study": r["path_to_study"], "anatomical_region": r["anatomical_region"], "roi": name,
+                        "polygon_px": "; ".join(f"{x:.1f},{y:.1f}" for x, y in poly), "status": status})
+    return out
+
+
+def write_xlsx(rows: list[dict], path: str, review: dict | None = None) -> None:
     wb = Workbook()
     ws = wb.active
     ws.title = "results"
@@ -192,6 +213,10 @@ def write_xlsx(rows: list[dict], path: str) -> None:
     ws2.append(SUMMARY_COLUMNS)
     for r in study_summary(rows):
         ws2.append([r[c] for c in SUMMARY_COLUMNS])
+    ws3 = wb.create_sheet("разметка")
+    ws3.append(MARKUP_COLUMNS)
+    for r in markup_rows(rows, review):
+        ws3.append([r[c] for c in MARKUP_COLUMNS])
     wb.save(path)
 
 

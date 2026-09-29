@@ -22,8 +22,9 @@ docker run -d --name dxaqc -p 8000:8000 --restart unless-stopped dxaqc       # �
 
 ## 3. Сборка под другую архитектуру
 
-`docker build --platform linux/amd64 -t dxaqc:amd64 .` — сборка x86-64 на ARM-машине. GPU не требуется; для CUDA замените в
-`Dockerfile` индекс колёс PyTorch на `https://download.pytorch.org/whl/cu121` и запускайте с `--gpus all`.
+`docker build --platform linux/amd64 -t dxaqc:amd64 .` — сборка x86-64 на ARM-машине. GPU не требуется. Для машины с видеокартой NVIDIA
+есть `Dockerfile.cuda` (PyTorch для CUDA 12.1): `docker build -f Dockerfile.cuda -t dxaqc:cuda .`, запуск с `--gpus all`. Код сам выбирает
+устройство. На GPU этот вариант не проверялся: у команды нет такого оборудования; требование ТЗ по времени выполняется на CPU.
 
 ## 4. Сервер без Docker
 
