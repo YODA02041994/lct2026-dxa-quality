@@ -156,7 +156,7 @@ for i, (frame, info, name, photo) in enumerate(cards):
     if i < len(members):
         m = members[i]
         set_lines(shape(s9, name), [m["name"]])
-        set_lines(shape(s9, info), [m["role"], m["nick"], m["phone"], m["work"]])
+        set_lines(shape(s9, info), [x for x in (m["role"], m["nick"], m["phone"], m["work"]) if x])   # пустые строки не выводятся
         av = os.path.join(IMG, m.get("avatar", ""))
         if os.path.isfile(av):
             put_picture(s9, photo, av)
