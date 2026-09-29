@@ -21,7 +21,7 @@ build() {
 
 ensure_image() { docker image inspect "$IMAGE" >/dev/null 2>&1 || build; }
 
-abspath() { (cd "$(dirname "$1")" && printf '%s/%s\n' "$(pwd)" "$(basename "$1")"); }
+abspath() { local d; d="$(cd "$(dirname "$1")" && pwd)"; printf '%s/%s\n' "${d%/}" "$(basename "$1")"; }
 
 cmd="${1:-help}"; shift || true
 case "$cmd" in

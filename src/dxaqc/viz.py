@@ -52,6 +52,11 @@ def draw_overlay(img: np.ndarray, region: str, details: dict, verdict: dict, thr
         if P("head") and P("neck_sup") and P("neck_inf"):
             mid = ((P("neck_sup")[0] + P("neck_inf")[0]) // 2, (P("neck_sup")[1] + P("neck_inf")[1]) // 2)
             cv2.line(can, P("head"), mid, (255, 200, 80), 1, cv2.LINE_AA)
+    # предложенная разметка областей измерения: тела L1–L4, шейка бедра
+    for name, poly in (details.get("roi") or {}).items():
+        pts = np.array([[int(round(x * scale)), int(round(y * scale))] for x, y in poly], np.int32)
+        cv2.polylines(can, [pts], True, (110, 220, 110), 1, cv2.LINE_AA)
+        cv2.putText(can, f"ROI {name}", (int(pts[:, 0].max()) + 4, int(pts[:, 1].mean())), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (110, 220, 110), 1, cv2.LINE_AA)
     # предметы (карта object-CXR): рамки самых ярких пятен
     for b in details.get("objects", []) or []:
         x0, y0 = int(b["x"] * scale), int(b["y"] * scale)

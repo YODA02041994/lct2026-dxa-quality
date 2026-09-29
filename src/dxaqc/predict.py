@@ -100,8 +100,11 @@ class LandmarkPredictor(Predictor):
             feats = hip_features(lm, h, w, side, img, cnn)
         probs = self.crit.predict(feats, flags_for(region))
         from .criteria import explain
+        from .labels import pixel_mm
+        from .roi import propose
         comment, advice = explain(region, feats, probs, self.thresholds)
-        self._last = {"landmarks": lm, "features": feats, "probs": probs, "comment": comment, "advice": advice, "objects": boxes}
+        roi = propose("spine" if region == REGION_SPINE else "hip", lm, img, pixel_mm(w))   # предложение разметки областей измерения
+        self._last = {"landmarks": lm, "features": feats, "probs": probs, "comment": comment, "advice": advice, "objects": boxes, "roi": roi}
         return probs
 
     def explain(self) -> dict:
