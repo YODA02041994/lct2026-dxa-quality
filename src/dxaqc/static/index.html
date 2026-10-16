@@ -64,6 +64,7 @@
     <a class="ghost" id="dl-xlsx" style="display:none"><button class="ghost">results.xlsx</button></a>
     <a class="ghost" id="dl-csv" style="display:none"><button class="ghost">results.csv</button></a>
     <a class="ghost" id="dl-zip" style="display:none"><button class="ghost">серии DICOM (zip)</button></a>
+    <button class="ghost" id="demo" title="Прогнать встроенные примеры из обучающего набора">Пример</button>
     <a href="docs" target="_blank"><button class="ghost">API (Swagger)</button></a>
   </div>
   <div id="err" class="err" style="display:none"></div>
@@ -81,6 +82,19 @@ inp.onchange=()=>{files=[...inp.files];pick();};
 drop.addEventListener('drop',ev=>{files=[...ev.dataTransfer.files];pick();});
 function pick(){$('#picked').textContent=files.length?`${files.length} файл(ов), ${(files.reduce((a,f)=>a+f.size,0)/1048576).toFixed(1)} МБ`:'файлы не выбраны';$('#go').disabled=!files.length;}
 const SHORT={spine_positioning:'укладка',spine_axis_tilt:'ось',spine_artifact:'предметы',hip_positioning_rotation:'укладка/ротация',hip_roi_field:'поле ROI'};
+async function runDemo(){
+  const d=$('#demo'); d.disabled=true; d.textContent='Загружаю пример…'; $('#err').style.display='none';
+  try{
+    const j=await (await fetch('api/demo')).json();
+    if(!j.files||!j.files.length) throw new Error('на сервере нет демонстрационных файлов');
+    files=[];
+    for(const n of j.files){const b=await (await fetch('files/'+n)).blob(); files.push(new File([b],n));}
+    pick(); $('#go').click();
+  }catch(e){$('#err').textContent='Ошибка: '+e.message;$('#err').style.display='block';}
+  d.disabled=false; d.textContent='Пример';
+}
+$('#demo').onclick=runDemo;
+if(location.search.includes('demo=1')) window.addEventListener('load',runDemo);
 $('#go').onclick=async()=>{
   const fd=new FormData(); files.forEach(f=>fd.append('files',f,f.name));
   $('#go').disabled=true; $('#go').textContent='Считаю…'; $('#err').style.display='none'; $('#tbl').innerHTML=''; $('#stat').innerHTML='';

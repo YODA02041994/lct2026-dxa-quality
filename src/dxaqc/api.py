@@ -92,6 +92,16 @@ def files(name: str):
     return FileResponse(path, filename=os.path.basename(name))
 
 
+@app.get("/api/demo")
+def demo_files():
+    """Имена демонстрационных DICOM (demo_*.dcm в папке DXAQC_FILES): страница скачивает их и прогоняет как обычную загрузку,
+    чтобы результат можно было посмотреть без своих снимков. Снимки — из обучающего набора постановщика."""
+    if not FILES_DIR or not os.path.isdir(FILES_DIR):
+        return {"files": []}
+    names = sorted(n for n in os.listdir(FILES_DIR) if n.startswith("demo_") and n.lower().endswith(".dcm"))
+    return {"files": names}
+
+
 @app.post("/api/analyze")
 async def analyze(files: list[UploadFile] = File(...)):
     _cleanup()

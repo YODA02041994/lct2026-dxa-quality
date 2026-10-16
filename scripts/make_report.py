@@ -11,12 +11,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src"))
 from dxaqc.labels import VIOLATION_TEXT
 from dxaqc.predict import aggregate
+from dxaqc.scoliosis import damp_axis, measure
 from sklearn.metrics import f1_score, roc_auc_score, average_precision_score, balanced_accuracy_score, recall_score
 
 WORK = os.path.join(ROOT, "data", "work")
 crit = json.load(open(os.path.join(ROOT, "weights", "criteria.json"), encoding="utf-8"))
 thr = {c: m["threshold"] for c, m in crit["models"].items()}
 oof = json.load(open(os.path.join(WORK, "criteria_oof.json")))
+lm_oof = json.load(open(os.path.join(WORK, "landmarks_oof_spine.json")))
 man = {}
 for r in csv.DictReader(open(os.path.join(WORK, "manifest.csv"), encoding="utf-8-sig")):
     kind = "spine" if r["region"].startswith("Пояс") else "hip"
@@ -31,6 +33,8 @@ for i in ids:
     r = man[i]; flags = SP if r["region"].startswith("Пояс") else HP
     truth = {c: int(r[c]) for c in flags if r[c] != ""}
     probs = {c: oof[i].get(c, 0.0) for c in flags}
+    if i.endswith("spine") and i in lm_oof:                      # сколиоз: при выраженной деформации критерий оси гасится, как в бою (scoliosis.py)
+        probs, _ = damp_axis(probs, measure(lm_oof[i])["grade"])
     v = aggregate(probs, thr)
     y_bin.append(int(any(truth.values()))); p_bin.append(v.quality_prob); c_bin.append(v.quality_class); groups.append(r["study_dir"])
     for c in flags:
