@@ -85,11 +85,10 @@ const SHORT={spine_positioning:'укладка',spine_axis_tilt:'ось',spine_a
 async function runDemo(){
   const d=$('#demo'); d.disabled=true; d.textContent='Загружаю пример…'; $('#err').style.display='none';
   try{
-    const j=await (await fetch('api/demo')).json();
-    if(!j.files||!j.files.length) throw new Error('на сервере нет демонстрационных файлов');
-    files=[];
-    for(const n of j.files){const b=await (await fetch('files/'+n)).blob(); files.push(new File([b],n));}
-    pick(); $('#go').click();
+    $('#tbl').innerHTML=''; $('#stat').innerHTML='';
+    const r=await fetch('api/demo',{method:'POST'}); const j=await r.json();
+    if(!r.ok||j.error) throw new Error(j.error||j.detail||r.statusText);
+    $('#picked').textContent=`пример: ${j.rows.length} снимков обучающего набора`; render(j);
   }catch(e){$('#err').textContent='Ошибка: '+e.message;$('#err').style.display='block';}
   d.disabled=false; d.textContent='Пример';
 }
@@ -115,7 +114,7 @@ function render(j){
     const lvl=r.details&&r.details.level;
     const LEVEL={repeat:['bad','переснять'],check:['warn','проверить укладку'],ok:['ok','в норме']};
     const rev=(lvl&&lvl!=='repeat'&&LEVEL[lvl]?`<span class="pill ${LEVEL[lvl][0]}" title="${lvl==='check'?'критерий у порога или выше мягкого порога: '+((r.details.check_flags||[]).concat(r.details.review_flags||[]).filter((v,i,a)=>a.indexOf(v)===i).map(k=>SHORT[k]||k).join(', ')):'все критерии ниже мягких порогов'}">${LEVEL[lvl][1]}</span> `:'')
-      +(r.details&&r.details.scoliosis&&r.details.scoliosis.grade&&r.details.scoliosis.grade!=='none'?`<span class="pill info" title="угол искривления по центрам тел позвонков ${r.details.scoliosis.bend_deg}°; не критерий ТЗ">${esc(r.details.scoliosis.title||'сколиоз')}</span> `:'');
+      +(r.details&&r.details.scoliosis&&r.details.scoliosis.grade==='marked'?`<span class="pill info" title="угол искривления по центрам тел позвонков ${r.details.scoliosis.bend_deg}°; не критерий ТЗ">${esc(r.details.scoliosis.title||'сколиотическая деформация')}</span> `:'');
     const crit=r.details?Object.entries(r.details.probs).map(([k,v])=>`<span class="${r.violation_type&&v>=0.5?'hit':''}">${SHORT[k]||k} ${v.toFixed(2)}</span>`).join(''):'';
     const p=r.quality_prob!=null?Number(r.quality_prob):0;
     return `<tr class="${st}"><td>${r.n+1}</td><td>${esc(r.path_to_study)}${r.duplicate_of?`<div class="muted">дубликат ${esc(r.duplicate_of)}</div>`:''}</td>

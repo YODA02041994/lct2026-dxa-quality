@@ -151,8 +151,9 @@ def process_file(path: str, root: str, predictor: Predictor, cache: dict) -> dic
         scol = dict(ex.get("scoliosis") or {}) if ex else {}
         if scol:
             from .scoliosis import GRADE_TITLE, decision_text
-            scol["title"] = GRADE_TITLE.get(scol.get("grade", "none"), "")
-            scol["text"] = decision_text(scol.get("grade", "none"), verdict.quality_class == 1)
+            marked = scol.get("grade") == "marked"                   # плашка и текст — только для выраженной деформации
+            scol["title"] = GRADE_TITLE.get(scol.get("grade", "none"), "") if marked else ""
+            scol["text"] = decision_text(scol.get("grade", "none"), verdict.quality_class == 1) if marked else ""
         row["details"] = json.dumps({"probs": {k: round(v, 4) for k, v in verdict.flag_probs.items()}, "region_by": region_by,
                                      "region_votes": {"width": region_w, "localizers": region_loc, "flexray": region_fx},
                                      "level": verdict.level, "check_flags": verdict.check_flags, "scoliosis": scol,

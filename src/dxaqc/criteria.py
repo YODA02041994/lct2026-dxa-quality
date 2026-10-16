@@ -374,6 +374,8 @@ def explain(region: str, f: dict, probs: dict, thresholds: dict) -> tuple[str, l
         parts.append(f"Th12 (уверенность {f.get('th12_conf', 0):.2f})")
         if f.get("th_frac40", 0) > 0.003:
             parts.append(f"тонкие яркие линии вне столба ({f.get('th_frac40', 0) * 100:.1f} % площади)")
+        if f.get("scol_bend_deg", 0) >= 5:                      # пограничная асимметрия — как измерение, не как вердикт
+            parts.append(f"искривление по центрам тел {f['scol_bend_deg']:.1f}°" + (" (пограничная асимметрия, не нарушение укладки)" if f["scol_bend_deg"] < 10 else ""))
     else:
         parts.append(f"диафиз {f.get('shaft_img_deg', 0):.1f}° к вертикали")
         parts.append(f"запас до края: снизу {f.get('bottom_cm', 0):.1f} см, сверху {f.get('top_cm', 0):.1f} см, сбоку {f.get('lat_cm', 0):.1f} см")

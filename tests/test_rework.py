@@ -56,10 +56,10 @@ def test_scoliosis_grades_and_damping(monkeypatch):
 
 
 def test_decision_text_without_numbers():
-    for grade in (GRADE_BORDERLINE, GRADE_MARKED):
-        for other in (False, True):
-            t = decision_text(grade, other)
-            assert t and not re.search(r"\d", t), t
+    for other in (False, True):
+        t = decision_text(GRADE_MARKED, other)
+        assert t and not re.search(r"\d", t), t
+    assert decision_text(GRADE_BORDERLINE, False) == ""      # пограничная асимметрия — строка в измерениях, не вердикт
     assert decision_text(GRADE_NONE, False) == ""
 
 

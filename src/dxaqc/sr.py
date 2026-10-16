@@ -72,7 +72,8 @@ def build_sr(src: pydicom.Dataset, row: dict, details: dict) -> pydicom.FileData
         _text("Level", str(row.get("level") or "")),
         _text("Scoliosis", (f"{(details.get('scoliosis') or {}).get('title', '')}: угол искривления по центрам тел "
                             f"{(details.get('scoliosis') or {}).get('bend_deg')}°. {(details.get('scoliosis') or {}).get('text', '')}").strip(": ")
-              if (details.get("scoliosis") or {}).get("grade") not in (None, "", "none") else "не выявлена"),
+              if (details.get("scoliosis") or {}).get("grade") == "marked"
+              else ("не выявлена" + (f" (угол искривления по центрам тел {(details.get('scoliosis') or {}).get('bend_deg')}°)" if (details.get("scoliosis") or {}).get("bend_deg") is not None else ""))),
         _text("Review", "требует проверки врача" if details.get("needs_review") else "уверенное решение"),
         _text("Objects", json.dumps(details.get("objects", []), ensure_ascii=False)),
     ]
