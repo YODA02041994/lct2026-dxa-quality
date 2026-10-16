@@ -71,9 +71,17 @@ def draw_overlay(img: np.ndarray, region: str, details: dict, verdict: dict, thr
     # вердикт по критериям — сверху
     y = 18
     cls = int(verdict.get("quality_class", 0))
-    head = f"{'VIOLATION' if cls else 'OK'}  p={float(verdict.get('quality_prob', 0)):.2f}"
-    cv2.rectangle(can, (0, 0), (w * scale, 22 + 16 * len(probs)), (30, 30, 30), -1)
+    level = str(details.get("level") or verdict.get("level") or "")
+    head = f"{'VIOLATION' if cls else 'OK'}  p={float(verdict.get('quality_prob', 0)):.2f}" + (f"  level: {level}" if level else "")
+    scol = details.get("scoliosis") or {}
+    extra = 1 if scol.get("grade") and scol.get("grade") != "none" else 0
+    cv2.rectangle(can, (0, 0), (w * scale, 22 + 16 * (len(probs) + extra)), (30, 30, 30), -1)
     cv2.putText(can, head, (6, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, bad_col if cls else ok_col, 1, cv2.LINE_AA)
+    if extra:                                        # сколиоз — отдельной строкой, это не критерий ТЗ (шрифты OpenCV без кириллицы)
+        y += 16
+        grade = {"borderline": "borderline asymmetry", "marked": "scoliotic deformity"}.get(scol["grade"], scol["grade"])
+        cv2.putText(can, f"scoliosis: {grade}, {scol.get('bend_deg')} deg (not a criterion)" + ("; axis not penalized" if scol.get("axis_damped") else ""),
+                    (6, y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 210, 120), 1, cv2.LINE_AA)
     for c, p in probs.items():
         y += 16
         thr = thresholds.get(c, 0.5)

@@ -24,14 +24,15 @@ from openpyxl import Workbook
 from .labels import PROB_COLUMN, REGION_HIP
 from .loader import _pixel_hash
 from .predict import NullPredictor, Predictor, aggregate, load_default_predictor
-from .region import hip_side, region_by_width
+from .region import decide_region, hip_side, region_by_width
 
 log = logging.getLogger("dxaqc")
 
 # официальные колонки ТЗ (п. 2.5) + разрешённая quality_prob; затем наши служебные — проверке не мешают
 OFFICIAL = ["path_to_study", "study_uid", "image_uid", "anatomical_region", "quality_class",
             "violation_type", PROB_COLUMN, "processing_status", "time_of_processing"]
-SERVICE = ["study_dir", "side", "duplicate_of", "error_message", "details"]
+SERVICE = ["study_dir", "side", "level", "duplicate_of", "error_message", "details"]
+LEVEL_TITLE = {"repeat": "переснять", "check": "проверить укладку", "ok": "в норме"}   # три уровня выдачи для лаборанта (predict.aggregate)
 COLUMNS = OFFICIAL + SERVICE
 
 
@@ -124,28 +125,42 @@ def process_file(path: str, root: str, predictor: Predictor, cache: dict) -> dic
         row["study_uid"] = str(getattr(ds, "StudyInstanceUID", "") or "")
         row["image_uid"] = str(getattr(ds, "SOPInstanceUID", "") or "")
         img = _pixels(ds)
-        region = region_by_width(int(img.shape[1]))
-        region_by = "width"
-        if region is None and hasattr(predictor, "guess_region"):      # нестандартная ширина кадра: область по локализаторам
-            region, region_by = predictor.guess_region(img), "localizers"
+        # область — по анатомии (локализаторы, при наличии FleXray), ширина кадра — подсказка (region.decide_region)
+        region_w = region_by_width(int(img.shape[1]))
+        region_loc = predictor.guess_region(img) if hasattr(predictor, "guess_region") else None
+        region_fx = predictor.fxr_region(img) if hasattr(predictor, "fxr_region") else None
+        region, region_by, region_agree = decide_region(region_w, region_loc, region_fx)
         if region is None:
-            raise ValueError(f"unsupported_image: кадр {img.shape[0]}×{img.shape[1]} не похож на "
-                             f"позвоночник (300 px) или бедро (280/248 px)")
+            raise ValueError(f"unsupported_image: кадр {img.shape[0]}×{img.shape[1]} — скелет поясничного отдела "
+                             f"или проксимального отдела бедра не распознан")
         h = _pixel_hash(ds)
         if h in cache:
             verdict, side, first = cache[h]
             row["duplicate_of"] = first
         else:
             side = hip_side(img).side if region == REGION_HIP else ""
-            verdict = aggregate(predictor.predict_flags(img, region, side or None), predictor.thresholds)
+            verdict = aggregate(predictor.predict_flags(img, region, side or None), predictor.thresholds,
+                                getattr(predictor, "soft_thresholds", None))
+            if not region_agree:                                     # область по анатомии разошлась с шириной кадра — показать глазами
+                verdict.needs_review = True
+                verdict.review_flags = list(verdict.review_flags) + ["region"]
+                if verdict.level == "ok":
+                    verdict.level = "check"
             cache[h] = (verdict, side, rel)
         ex = predictor.explain() if row["duplicate_of"] == "" else {}
+        scol = dict(ex.get("scoliosis") or {}) if ex else {}
+        if scol:
+            from .scoliosis import GRADE_TITLE, decision_text
+            scol["title"] = GRADE_TITLE.get(scol.get("grade", "none"), "")
+            scol["text"] = decision_text(scol.get("grade", "none"), verdict.quality_class == 1)
         row["details"] = json.dumps({"probs": {k: round(v, 4) for k, v in verdict.flag_probs.items()}, "region_by": region_by,
+                                     "region_votes": {"width": region_w, "localizers": region_loc, "flexray": region_fx},
+                                     "level": verdict.level, "check_flags": verdict.check_flags, "scoliosis": scol,
                                      "needs_review": verdict.needs_review, "review_flags": verdict.review_flags,
                                      "comment": ex.get("comment", ""), "advice": ex.get("advice", []), "objects": ex.get("objects", []), "roi": ex.get("roi", {}),
                                      "landmarks": {k: [round(v["x"], 1), round(v["y"], 1), round(v.get("conf", 1), 2)] for k, v in ex.get("landmarks", {}).items() if v.get("present")},
                                      "features": {k: round(float(v), 2) for k, v in ex.get("features", {}).items()}}, ensure_ascii=False) if ex else ""
-        row.update({"anatomical_region": region, "side": side, "quality_class": verdict.quality_class,
+        row.update({"anatomical_region": region, "side": side, "level": LEVEL_TITLE.get(verdict.level, ""), "quality_class": verdict.quality_class,
                     "violation_type": verdict.violation_type, PROB_COLUMN: verdict.quality_prob,
                     "processing_status": "Success"})
     except Exception as exc:  # noqa: BLE001 — по ТЗ ни одна ошибка не должна уронить пакет

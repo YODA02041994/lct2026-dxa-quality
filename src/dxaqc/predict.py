@@ -80,7 +80,21 @@ class LandmarkPredictor(Predictor):
         if mode != "competition" and mode in cj.get("modes", {}):
             self.thresholds = {c: float(t) for c, t in cj["modes"][mode].items()}
         self.mode = mode
+        # мягкие пороги (чувствительность ≥ 0,8 по критерию) — зона «проверить укладку» между нормой и «переснять»
+        soft = (cj.get("modes") or {}).get("soft")
+        self.soft_thresholds = {c: float(t) for c, t in soft.items()} if isinstance(soft, dict) else None
+        from .fxr_seg import FlexraySeg
+        self.fxr = FlexraySeg(weights_dir)                             # необязательный модуль; без весов — ok = False
         self._last: dict = {}
+
+    def fxr_region(self, img: np.ndarray) -> str | None:
+        """Голос FleXray за область (None — модуль выключен или скелета в кадре нет)."""
+        if not getattr(self, "fxr", None) or not self.fxr.ok:
+            return None
+        try:
+            return self.fxr.region_vote(img)
+        except Exception:  # noqa: BLE001
+            return None
 
     def predict_flags(self, img, region, side):
         from .criteria import hip_features, spine_features
@@ -93,6 +107,11 @@ class LandmarkPredictor(Predictor):
                 om, boxes = self.objmap.features(img)
                 cnn.update(om)
             feats = spine_features(lm, h, w, img, cnn)
+            if getattr(self, "fxr", None) and self.fxr.ok:
+                try:
+                    feats.update(self.fxr.spine_features(img))
+                except Exception:  # noqa: BLE001
+                    pass
         else:
             boxes = []
             lm = self.loc["hip"].predict(img, side)
@@ -102,9 +121,17 @@ class LandmarkPredictor(Predictor):
         from .criteria import explain
         from .labels import pixel_mm
         from .roi import propose
+        scol = None
+        if region == REGION_SPINE:                                     # сколиоз — отдельно от критериев (scoliosis.py)
+            from .scoliosis import damp_axis, measure
+            scol = measure(lm, pixel_mm(w))
+            probs, scol["axis_damped"] = damp_axis(probs, scol["grade"])
+            feats["scol_bend_deg"] = scol["bend_deg"] if scol["bend_deg"] is not None else 0.0
+            feats["scol_dev_mm"] = scol["dev_mm"] if scol["dev_mm"] is not None else 0.0
         comment, advice = explain(region, feats, probs, self.thresholds)
         roi = propose("spine" if region == REGION_SPINE else "hip", lm, img, pixel_mm(w))   # предложение разметки областей измерения
-        self._last = {"landmarks": lm, "features": feats, "probs": probs, "comment": comment, "advice": advice, "objects": boxes, "roi": roi}
+        self._last = {"landmarks": lm, "features": feats, "probs": probs, "comment": comment, "advice": advice, "objects": boxes, "roi": roi,
+                      "scoliosis": scol}
         return probs
 
     def explain(self) -> dict:
@@ -141,6 +168,8 @@ class Verdict:
     flag_probs: dict[str, float] = field(default_factory=dict)
     needs_review: bool = False                        # хотя бы один критерий у порога: решение стоит проверить глазами
     review_flags: list[str] = field(default_factory=list)
+    level: str = "ok"                                 # три уровня для лаборанта: repeat (= quality_class 1) · check · ok
+    check_flags: list[str] = field(default_factory=list)   # критерии, прошедшие мягкий порог (зона «проверить укладку»)
 
 
 def relative_prob(p: float, threshold: float) -> float:
@@ -152,7 +181,8 @@ def relative_prob(p: float, threshold: float) -> float:
     return 1.0 / (1.0 + math.exp(-z))
 
 
-def aggregate(flag_probs: dict[str, float], thresholds: dict[str, float] | None = None) -> Verdict:
+def aggregate(flag_probs: dict[str, float], thresholds: dict[str, float] | None = None,
+              soft_thresholds: dict[str, float] | None = None) -> Verdict:
     """Вероятности критериев → итог по снимку.
 
     quality_class = 1, если хотя бы один критерий не ниже своего порога (правило организатора: любое
@@ -166,6 +196,12 @@ def aggregate(flag_probs: dict[str, float], thresholds: dict[str, float] | None 
     if any(positive.values()):                       # защита от округления на самой границе порога
         prob = max(prob, 0.5)
     near = [f for f, p in flag_probs.items() if abs(p - thresholds.get(f, DEFAULT_THRESHOLD)) < REVIEW_BAND]
+    # Три уровня выдачи (консультация 16.10, сценарий «помощь лаборанту»): «переснять» — порог критерия пройден;
+    # «проверить укладку» — критерий выше мягкого порога (чувствительность ≥ 0,8 вне обучения) или у порога; иначе «в норме».
+    # quality_class и quality_prob от этого не меняются — официальный ответ остаётся прежним.
+    soft = soft_thresholds or {}
+    check = [f for f, p in flag_probs.items() if not positive[f] and (p >= soft.get(f, 2.0) or f in near)]
+    level = "repeat" if any(positive.values()) else "check" if check else "ok"
     return Verdict(
         quality_class=int(any(positive.values())),
         violation_type=violation_string(positive),
@@ -173,4 +209,6 @@ def aggregate(flag_probs: dict[str, float], thresholds: dict[str, float] | None 
         flag_probs=dict(flag_probs),
         needs_review=bool(near),
         review_flags=near,
+        level=level,
+        check_flags=check,
     )

@@ -214,13 +214,20 @@
    "hip_positioning_rotation": 0.54,
    "hip_roi_field": 0.9
   },
+  "soft": {
+   "spine_positioning": 0.44,
+   "spine_axis_tilt": 0.4,
+   "spine_artifact": 0.43,
+   "hip_positioning_rotation": 0.49,
+   "hip_roi_field": 0.28
+  },
   "sensitive": {
-   "spine_positioning": 0.36,
+   "spine_positioning": 0.37,
    "spine_axis_tilt": 0.35,
    "spine_artifact": 0.21,
    "hip_positioning_rotation": 0.24,
    "hip_roi_field": 0.27
   },
-  "note": "competition — пороги по максимуму F1 на OOF (сдача); sensitive — recall ≥ 0,9 по критерию для клиники, где пропуск дороже перепроверки"
+  "note": "competition — пороги по максимуму F1 на OOF (официальный ответ); soft — recall ≥ 0,8 по критерию, зона «проверить укладку» в трёхуровневой выдаче; sensitive — recall ≥ 0,9 для клиники, где пропуск дороже перепроверки"
  }
 }

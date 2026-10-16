@@ -1,7 +1,10 @@
 """Определение анатомической области и стороны бедра по изображению.
 
-Область — по ширине кадра (стандарт аппарата GE Lunar Prodigy Advance, подтверждено постановщиком
-16–17.09): 300 px — поясничный отдел, 280 px — проксимальный отдел бедра. В закрытом тесте так же.
+Область — по анатомии: первый голос — уверенность локализаторов ориентиров позвоночника и бедра
+(LandmarkPredictor.guess_region), второй — сегментация FleXray, если модуль включён (fxr_seg.py).
+Ширина кадра (стандарт GE Lunar Prodigy Advance, подтверждено постановщиком 16–17.09: 300 px — поясничный
+отдел, 280 px — бедро) — только подсказка и арбитр, если голоса анатомии разошлись. Так решение не зависит от
+размера файла — замечание экспертов на консультации 16.10 («не по размеру сторон файла»).
 Сторона бедра для сдачи не нужна (`anatomical_region` без стороны), но нужна нам: разметка
 организатора ведётся отдельно по правому и левому бедру.
 
@@ -70,3 +73,24 @@ def assign_sides(balances: list[float]) -> list[str]:
     if len(balances) == 2:
         return ["R", "L"] if balances[0] >= balances[1] else ["L", "R"]
     return ["R" if b > 0 else "L" for b in balances]
+
+
+def decide_region(width_vote: str | None, loc_vote: str | None, fxr_vote: str | None = None) -> tuple[str | None, str, bool]:
+    """Голосование за область. → (область, чем решено, согласуется ли с шириной кадра).
+
+    1. Голоса анатомии (локализаторы, FleXray) согласны → берём их; ширина кадра лишь проверяется.
+    2. Голоса анатомии разошлись → решает ширина, если кадр стандартный; иначе локализаторы.
+    3. Анатомии нет (кадр без скелета) → ширина; нет и её → None, такой кадр не поддерживается.
+    """
+    votes = [v for v in (loc_vote, fxr_vote) if v]
+    if votes and all(v == votes[0] for v in votes):
+        region = votes[0]
+        agree = width_vote in (None, region)
+        return region, ("anatomy" if agree else "anatomy (width mismatch)"), agree
+    if loc_vote and fxr_vote and loc_vote != fxr_vote:
+        if width_vote:
+            return width_vote, "width (anatomy votes disagreed)", False
+        return loc_vote, "localizers (flexray disagreed)", False
+    if width_vote:
+        return width_vote, "width", True
+    return None, "none", False

@@ -32,7 +32,7 @@
   tr.ok td:first-child{border-left:4px solid var(--ok)}
   tr.fail td:first-child{border-left:4px solid var(--warn)}
   .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
-  .pill.bad{background:#fbe3df;color:var(--bad)} .pill.ok{background:#e1f3e8;color:var(--ok)} .pill.fail{background:#fbefd9;color:var(--warn)}
+  .pill.bad{background:#fbe3df;color:var(--bad)} .pill.ok{background:#e1f3e8;color:var(--ok)}.pill.warn{background:#fff3cd;color:#7a5a00;border:1px solid #f0d78a}.pill.info{background:#e8f0fe;color:#1a3d7a;border:1px solid #b9cdf5} .pill.fail{background:#fbefd9;color:var(--warn)}
   .bar{display:inline-block;width:70px;height:8px;background:#eee;border-radius:4px;vertical-align:middle;margin-left:6px;overflow:hidden}
   .bar i{display:block;height:100%;background:var(--accent)}
   .crit{font-size:12px;color:var(--muted);white-space:nowrap}
@@ -98,13 +98,16 @@ function render(j){
   $('#dl-zip').href=s.xlsx.replace('results.xlsx','series.zip'); $('#dl-zip').style.display='inline';
   const rows=j.rows.map(r=>{
     const st=r.processing_status!=='Success'?'fail':(r.quality_class?'bad':'ok');
-    const rev=r.details&&r.details.needs_review?`<span class="pill fail" title="критерий у порога: ${(r.details.review_flags||[]).map(k=>SHORT[k]||k).join(', ')}">проверить</span> `:'';
+    const lvl=r.details&&r.details.level;
+    const LEVEL={repeat:['bad','переснять'],check:['warn','проверить укладку'],ok:['ok','в норме']};
+    const rev=(lvl&&lvl!=='repeat'&&LEVEL[lvl]?`<span class="pill ${LEVEL[lvl][0]}" title="${lvl==='check'?'критерий у порога или выше мягкого порога: '+((r.details.check_flags||[]).concat(r.details.review_flags||[]).filter((v,i,a)=>a.indexOf(v)===i).map(k=>SHORT[k]||k).join(', ')):'все критерии ниже мягких порогов'}">${LEVEL[lvl][1]}</span> `:'')
+      +(r.details&&r.details.scoliosis&&r.details.scoliosis.grade&&r.details.scoliosis.grade!=='none'?`<span class="pill info" title="угол искривления по центрам тел позвонков ${r.details.scoliosis.bend_deg}°; не критерий ТЗ">${esc(r.details.scoliosis.title||'сколиоз')}</span> `:'');
     const crit=r.details?Object.entries(r.details.probs).map(([k,v])=>`<span class="${r.violation_type&&v>=0.5?'hit':''}">${SHORT[k]||k} ${v.toFixed(2)}</span>`).join(''):'';
     const p=r.quality_prob!=null?Number(r.quality_prob):0;
     return `<tr class="${st}"><td>${r.n+1}</td><td>${esc(r.path_to_study)}${r.duplicate_of?`<div class="muted">дубликат ${esc(r.duplicate_of)}</div>`:''}</td>
       <td>${esc(r.anatomical_region||'')}${r.side?` (${r.side})`:''}</td>
       <td>${st==='fail'?`<span class="pill fail">Failure</span><div class="muted">${esc(r.error_message||'')}</div>`:(r.quality_class?`<span class="pill bad">нарушение</span>`:`<span class="pill ok">норма</span>`)+' '+rev}</td>
-      <td>${esc(r.violation_type||'')}${r.details&&r.details.comment?`<div class="muted" style="font-size:12px">${esc(r.details.comment)}</div>`:''}${r.details&&r.details.advice&&r.details.advice.length?`<div style="font-size:12px;color:var(--accent2)">→ ${esc(r.details.advice.join(' '))}</div>`:''}</td>
+      <td>${esc(r.violation_type||'')}${r.details&&r.details.scoliosis&&r.details.scoliosis.text?`<div style="font-size:12px;color:#1a3d7a">${esc(r.details.scoliosis.text)}</div>`:''}${r.details&&r.details.comment?`<div class="muted" style="font-size:12px">измерения: ${esc(r.details.comment)}</div>`:''}${r.details&&r.details.advice&&r.details.advice.length?`<div style="font-size:12px;color:var(--accent2)">→ ${esc(r.details.advice.join(' '))}</div>`:''}</td>
       <td>${st==='fail'?'':`${p.toFixed(2)}<span class="bar"><i style="width:${Math.round(p*100)}%"></i></span>`}<div class="crit">${crit}</div></td>
       <td>${st==='fail'?'':`<a class="lnk" onclick="show('${j.run_id}',${r.n})">снимок</a>`}</td>
       <td id="mk-${r.n}">${st!=='fail'&&r.details&&r.details.roi&&Object.keys(r.details.roi).length?`<div class="muted" style="font-size:12px">предложено: ${esc(Object.keys(r.details.roi).join(', '))}</div><a class="lnk" onclick="mark('${j.run_id}',${r.n},'confirmed')">подтвердить</a> · <a class="lnk" onclick="mark('${j.run_id}',${r.n},'rejected')">отклонить</a>`:'<span class="muted">—</span>'}</td></tr>`;}).join('');

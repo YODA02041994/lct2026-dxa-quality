@@ -33,3 +33,6 @@ presentation/img/cases.jpg
 presentation/img/gradcam.jpg
 presentation/img/ov_*.png
 presentation/img/ui.png
+
+# FleXray: локальная копия флагманской модели (387 МБ, CC-BY-NC-4.0) — кладётся download_weights.sh
+weights/flexray/
