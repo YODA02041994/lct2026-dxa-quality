@@ -34,11 +34,11 @@ def card(stem, title, sys_line, exp_line):
 
 
 cards = [card(*c) for c in CASES]
-h = max(c.height for c in cards)
-cols, gap = 3, 24
-sheet = Image.new("RGB", (cols * CARD_W + (cols - 1) * gap, 2 * h + gap), "white")
-for i, c in enumerate(cards):
-    x, y = (i % cols) * (CARD_W + gap), (i // cols) * (h + gap)
-    sheet.paste(c, (x, y))
-sheet.save(os.path.join(HERE, "img", "cases2.jpg"), quality=88)
-print("cases2.jpg", sheet.size)
+gap = 24
+for name, grp in (("cases2a.jpg", cards[:3]), ("cases2b.jpg", cards[3:])):     # по три карточки в ряд — читается с экрана
+    h = max(c.height for c in grp)
+    sheet = Image.new("RGB", (3 * CARD_W + 2 * gap, h), "white")
+    for i, c in enumerate(grp):
+        sheet.paste(c, (i * (CARD_W + gap), 0))
+    sheet.save(os.path.join(HERE, "img", name), quality=88)
+    print(name, sheet.size)
