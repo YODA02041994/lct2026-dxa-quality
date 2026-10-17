@@ -365,7 +365,7 @@ ADVICE = {
 }
 
 
-def explain(region: str, f: dict, probs: dict, thresholds: dict) -> tuple[str, list[str]]:
+def explain(region: str, f: dict, probs: dict, thresholds: dict, soft: dict | None = None) -> tuple[str, list[str]]:
     """Протокол по критериям и рекомендации. Статус критерия берётся из вероятности и порога модели — текст не может
     противоречить вердикту (раньше фиксированная отсечка писала «гребни, возможно, вне кадра» на снимках в норме).
     Число показывается только у нарушенного или пограничного критерия, десятичная запятая, без служебных терминов."""
@@ -377,11 +377,13 @@ def explain(region: str, f: dict, probs: dict, thresholds: dict) -> tuple[str, l
     facts = {"spine_axis_tilt": f"наклон оси {num(f.get('axis_img_deg', 0))}°",
              "spine_artifact": "яркие линейные тени вне позвоночника" if f.get("th_frac40", 0) > 0.003 else "",
              "hip_positioning_rotation": f"наклон диафиза {num(f.get('shaft_img_deg', 0))}°",
-             "hip_roi_field": f"наименьший запас до края кадра {num(f.get('min_cm', 0))} см"}
+             "hip_roi_field": (f"наименьший запас до края кадра {num(f.get('min_cm', 0))} см" if f.get("min_cm", 0) > 0.05
+                               else "ориентиры ниже малого вертела не попали в кадр")}
     parts, advice = [], []
     for c, p in probs.items():
         thr = thresholds.get(c, 0.5)
-        state = "нарушение" if p >= thr else "у порога" if abs(p - thr) < 0.10 else "норма"
+        near = abs(p - thr) < 0.10 or p >= (soft or {}).get(c, 2.0)     # как уровень «проверить укладку» в predict.aggregate
+        state = "нарушение" if p >= thr else "у порога" if near else "норма"
         fact = facts.get(c, "") if state != "норма" else ""
         parts.append(f"{names.get(c, c)} — {state}" + (f" ({fact})" if fact else ""))
         if p >= thr:

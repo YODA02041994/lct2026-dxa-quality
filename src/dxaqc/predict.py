@@ -128,7 +128,7 @@ class LandmarkPredictor(Predictor):
             probs, scol["axis_damped"] = damp_axis(probs, scol["grade"])
             feats["scol_bend_deg"] = scol["bend_deg"] if scol["bend_deg"] is not None else 0.0
             feats["scol_dev_mm"] = scol["dev_mm"] if scol["dev_mm"] is not None else 0.0
-        comment, advice = explain(region, feats, probs, self.thresholds)
+        comment, advice = explain(region, feats, probs, self.thresholds, getattr(self, "soft_thresholds", None))
         roi = propose("spine" if region == REGION_SPINE else "hip", lm, img, pixel_mm(w))   # предложение разметки областей измерения
         self._last = {"landmarks": lm, "features": feats, "probs": probs, "comment": comment, "advice": advice, "objects": boxes, "roi": roi,
                       "scoliosis": scol}
