@@ -13,7 +13,7 @@ docker run --rm -v "$PWD/in:/in" -v "$PWD/out:/out" dxaqc run -i /in -o /out
 docker run -d --name dxaqc -p 8000:8000 --restart unless-stopped dxaqc       # сервис
 ```
 
-Проверка: `curl http://localhost:8000/health` → `{"status":"ok","model":"landmarks","version":"1.0.0","weights_loaded":true}`.
+Проверка: `curl http://localhost:8000/health` → `{"status":"ok","model":"landmarks","version":"1.1.0","weights_loaded":true}`.
 
 ## 2. Машина без интернета
 

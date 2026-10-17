@@ -127,7 +127,7 @@ need_weights = pytest.mark.skipif(not os.path.exists(os.path.join(WEIGHTS, "land
 @need_test
 @need_weights
 def test_nonstandard_frame_width_gets_region_from_localizers(tmp_path):
-    """Кадр нестандартной ширины: область определяют локализаторы; кадр без анатомии — Failure, пакет не падает."""
+    """Кадр нестандартной ширины: область определяет анатомия (локализаторы, при наличии FleXray); кадр без анатомии — Failure, пакет не падает."""
     import json
     import pydicom
     from dxaqc.predict import load_default_predictor
@@ -151,7 +151,7 @@ def test_nonstandard_frame_width_gets_region_from_localizers(tmp_path):
     for name, region in expect.items():
         assert by[name]["processing_status"] == "Success"
         assert by[name]["anatomical_region"] == region
-        assert json.loads(by[name]["details"])["region_by"] == "localizers"
+        assert json.loads(by[name]["details"])["region_by"] in ("anatomy", "localizers")
     assert by["blank.dcm"]["processing_status"] == "Failure" and "unsupported_image" in by["blank.dcm"]["error_message"]
 
 

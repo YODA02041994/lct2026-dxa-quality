@@ -33,3 +33,12 @@ presentation/img/cases.jpg
 presentation/img/gradcam.jpg
 presentation/img/ov_*.png
 presentation/img/ui.png
+
+# FleXray: локальная копия флагманской модели (387 МБ, CC-BY-NC-4.0) — кладётся download_weights.sh
+weights/flexray/
+
+# снимки постановщика для слайдов и снимки стенда — только в презентации (Release/стенд), не в git (AGENTS.md, правило 1)
+presentation/img/cases_src/
+presentation/img/cases2*.jpg
+presentation/img/ui_levels*.jpg
+presentation/img/ui_*.jpg

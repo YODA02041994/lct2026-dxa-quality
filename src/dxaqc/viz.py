@@ -1,20 +1,57 @@
 """Объяснимость: рисуем на снимке то, по чему принято решение — ориентиры, ось, вердикт по критериям.
 
-Используется API (/api/runs/{id}/overlay/{n}.png) и скриптом экспорта доп. серии. Только OpenCV, без шрифтов
-с кириллицей: подписи критериев — латиницей/цифрами, официальный текст нарушения показывается в интерфейсе.
+Используется API (/api/runs/{id}/overlay/{n}.png) и доп. серией DICOM. Линии и точки — OpenCV, подписи — Pillow со шрифтом
+DejaVu Sans (лежит в пакете, src/dxaqc/fonts, свободная лицензия): серия попадает в PACS к русскоязычным врачам, поэтому
+все надписи по-русски.
 """
 from __future__ import annotations
 
 import math
+import os
 
 import cv2
 import numpy as np
 
 from .labels import REGION_SPINE
 
-SHORT = {"spine_positioning": "positioning", "spine_axis_tilt": "axis", "spine_artifact": "artifact",
-         "hip_positioning_rotation": "positioning/rotation", "hip_roi_field": "ROI field"}
+SHORT = {"spine_positioning": "укладка", "spine_axis_tilt": "ось", "spine_artifact": "посторонние предметы",
+         "hip_positioning_rotation": "укладка и ротация", "hip_roi_field": "поле сканирования"}
 SPINE_ORDER = ["th12", "L1", "L2", "L3", "L4", "L5"]
+LM_TITLE = {"th12": "Th12", "crest_l": "гребень", "crest_r": "гребень", "head": "головка", "gt_top": "б. вертел", "gt_lat": "б. вертел",
+            "neck_sup": "шейка", "neck_inf": "шейка", "lt_tip": "м. вертел", "lt_up": "", "lt_down": "", "ischium": "седалищный бугор",
+            "shaft_top": "диафиз", "shaft_bot": ""}
+LEVEL_TITLE = {"repeat": "переснять", "check": "проверить укладку", "ok": "в норме"}
+FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+_FONTS: dict = {}
+
+
+def _font(size: int, bold: bool = False):
+    from PIL import ImageFont
+    key = (size, bold)
+    if key not in _FONTS:
+        path = os.path.join(FONT_DIR, "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf")
+        try:
+            _FONTS[key] = ImageFont.truetype(path, size)
+        except OSError:                                   # шрифта нет — подписи останутся, но мелким растровым шрифтом
+            _FONTS[key] = ImageFont.load_default()
+    return _FONTS[key]
+
+
+def _num(x: float, nd: int = 2) -> str:
+    return f"{float(x):.{nd}f}".replace(".", ",")
+
+
+def _draw_texts(bgr: np.ndarray, items: list) -> np.ndarray:
+    """items: (x, y_baseline, текст, BGR-цвет, кегль px, жирный). Рисуем Pillow поверх готовой картинки."""
+    if not items:
+        return bgr
+    from PIL import Image, ImageDraw
+    im = Image.fromarray(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
+    d = ImageDraw.Draw(im)
+    for x, y, text, col, size, bold in items:
+        if text:
+            d.text((int(x), int(y) - size), text, font=_font(size, bold), fill=(int(col[2]), int(col[1]), int(col[0])))
+    return cv2.cvtColor(np.asarray(im), cv2.COLOR_RGB2BGR)
 
 
 def to_uint8(img: np.ndarray) -> np.ndarray:
@@ -26,7 +63,7 @@ def to_uint8(img: np.ndarray) -> np.ndarray:
 
 def draw_overlay(img: np.ndarray, region: str, details: dict, verdict: dict, thresholds: dict | None = None,
                  scale: int = 3) -> np.ndarray:
-    """img — исходные пиксели; details — как в колонке details (landmarks: {name: [x, y, conf]}, probs, features);
+    """img — исходные пиксели; details — как в колонке details (landmarks: {name: [x, y, conf]}, probs, features, level, scoliosis);
     verdict — {"quality_class", "violation_type", "quality_prob"}. Возвращает BGR-картинку в масштабе scale."""
     g = to_uint8(img)
     h, w = g.shape
@@ -34,7 +71,8 @@ def draw_overlay(img: np.ndarray, region: str, details: dict, verdict: dict, thr
     lm = details.get("landmarks", {}) or {}
     probs = details.get("probs", {}) or {}
     thresholds = thresholds or {}
-    ok_col, bad_col, pt_col = (90, 200, 90), (70, 80, 230), (60, 220, 255)
+    ok_col, bad_col, warn_col, pt_col = (90, 200, 90), (70, 80, 230), (40, 180, 240), (60, 220, 255)
+    texts: list = []
     P = lambda k: (int(round(lm[k][0] * scale)), int(round(lm[k][1] * scale))) if k in lm else None  # noqa: E731
 
     # линии: ось позвоночника по центрам тел / ось диафиза бедра
@@ -56,40 +94,59 @@ def draw_overlay(img: np.ndarray, region: str, details: dict, verdict: dict, thr
     for name, poly in (details.get("roi") or {}).items():
         pts = np.array([[int(round(x * scale)), int(round(y * scale))] for x, y in poly], np.int32)
         cv2.polylines(can, [pts], True, (110, 220, 110), 1, cv2.LINE_AA)
-        cv2.putText(can, f"ROI {name}", (int(pts[:, 0].max()) + 4, int(pts[:, 1].mean())), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (110, 220, 110), 1, cv2.LINE_AA)
+        texts.append((int(pts[:, 0].max()) + 4, int(pts[:, 1].mean()) + 5, f"ROI {'шейка' if name == 'neck' else name}", (110, 220, 110), 13, False))
     # предметы (карта object-CXR): рамки самых ярких пятен
     for b in details.get("objects", []) or []:
         x0, y0 = int(b["x"] * scale), int(b["y"] * scale)
         cv2.rectangle(can, (x0, y0), (x0 + int(b["w"] * scale), y0 + int(b["h"] * scale)), (0, 0, 255), 2)
-        cv2.putText(can, f"object {b['score']:.2f}", (x0, max(10, y0 - 4)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1, cv2.LINE_AA)
+        texts.append((x0, max(14, y0 - 4), f"предмет {_num(b['score'])}", (0, 0, 255), 13, False))
     # ориентиры
     for k, v in lm.items():
         p = P(k)
         conf = v[2] if len(v) > 2 else 1.0
         cv2.circle(can, p, 4, pt_col if conf >= 0.5 else (0, 140, 255), -1, cv2.LINE_AA)
-        cv2.putText(can, k, (p[0] + 5, p[1] - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (255, 255, 255), 1, cv2.LINE_AA)
-    # вердикт по критериям — сверху
-    y = 18
+        texts.append((p[0] + 6, p[1] - 3, LM_TITLE.get(k, k), (255, 255, 255), 12, False))
+    # вердикт — сверху: уровень, критерии с порогами, сколиоз отдельной строкой
     cls = int(verdict.get("quality_class", 0))
-    head = f"{'VIOLATION' if cls else 'OK'}  p={float(verdict.get('quality_prob', 0)):.2f}"
-    cv2.rectangle(can, (0, 0), (w * scale, 22 + 16 * len(probs)), (30, 30, 30), -1)
-    cv2.putText(can, head, (6, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, bad_col if cls else ok_col, 1, cv2.LINE_AA)
+    level = str(details.get("level") or verdict.get("level") or ("repeat" if cls else "ok"))
+    scol = details.get("scoliosis") or {}
+    marked = scol.get("grade") == "marked"
+    rows = len(probs) + (1 if marked else 0)
+    top_h = 30 + 19 * rows
+    cv2.rectangle(can, (0, 0), (w * scale, top_h), (30, 30, 30), -1)
+    head_col = bad_col if level == "repeat" else warn_col if level == "check" else ok_col
+    texts.append((8, 22, f"{'НАРУШЕНИЕ' if cls else 'НОРМА'} · {LEVEL_TITLE.get(level, level)} · вероятность {_num(verdict.get('quality_prob', 0))}",
+                  head_col, 16, True))
+    y = 22
     for c, p in probs.items():
-        y += 16
+        y += 19
         thr = thresholds.get(c, 0.5)
         col = bad_col if p >= thr else (200, 200, 200)
         bar = int(60 * min(1.0, float(p)))
-        cv2.rectangle(can, (w * scale - 70, y - 9), (w * scale - 70 + bar, y - 1), col, -1)
-        cv2.rectangle(can, (w * scale - 70, y - 9), (w * scale - 10, y - 1), (120, 120, 120), 1)
-        cv2.putText(can, f"{SHORT.get(c, c)}: {float(p):.2f} (thr {thr:.2f})", (6, y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, col, 1, cv2.LINE_AA)
-    # ключевые признаки — снизу
-    f = details.get("features", {}) or {}
-    keys = ["axis_img_deg", "bottom_width", "th_frac40"] if region == REGION_SPINE else ["shaft_img_deg", "min_cm", "frame_h_cm"]
-    txt = "  ".join(f"{k}={f[k]}" for k in keys if k in f)
-    if txt:
-        cv2.rectangle(can, (0, h * scale - 18), (w * scale, h * scale), (30, 30, 30), -1)
-        cv2.putText(can, txt, (6, h * scale - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (220, 220, 220), 1, cv2.LINE_AA)
-    return can
+        cv2.rectangle(can, (w * scale - 72, y - 11), (w * scale - 72 + bar, y - 3), col, -1)
+        cv2.rectangle(can, (w * scale - 72, y - 11), (w * scale - 12, y - 3), (120, 120, 120), 1)
+        tx = int(w * scale - 72 + 60 * min(1.0, float(thr)))
+        cv2.line(can, (tx, y - 13), (tx, y - 1), (255, 255, 255), 1)          # отметка порога
+        texts.append((8, y, f"{SHORT.get(c, c)}: {_num(p)} (порог {_num(thr)})", col, 13, False))
+    if marked:
+        y += 19
+        texts.append((8, y, f"сколиотическая деформация, {_num(scol.get('bend_deg') or 0, 1)}° — не нарушение укладки"
+                      + ("; ось не бракуется" if scol.get("axis_damped") else ""), (255, 210, 120), 13, False))
+    # протокол по критериям — снизу
+    txt = str(details.get("comment") or "")
+    if txt:                                          # протокол по критериям, по словам в строки шириной кадра
+        lines, cur, limit = [], "", max(40, int(w * scale / 7.2))
+        for word in txt.split(" "):
+            if len(cur) + len(word) + 1 > limit and cur:
+                lines.append(cur); cur = word
+            else:
+                cur = (cur + " " + word).strip()
+        lines = (lines + [cur])[:3]
+        band = 8 + 17 * len(lines)
+        cv2.rectangle(can, (0, h * scale - band), (w * scale, h * scale), (30, 30, 30), -1)
+        for n, line in enumerate(lines):
+            texts.append((8, h * scale - band + 18 + 17 * n, line, (225, 225, 225), 12, False))
+    return _draw_texts(can, texts)
 
 
 def encode_png(bgr: np.ndarray) -> bytes:

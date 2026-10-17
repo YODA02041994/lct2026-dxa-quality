@@ -1,0 +1,101 @@
+{
+ "spine_positioning": {
+  "n": 99,
+  "pos": 6,
+  "stage1": {
+   "features": [
+    "bottom_width",
+    "soft_mean"
+   ],
+   "real_pos": [
+    0.26,
+    87.263
+   ],
+   "real_neg": [
+    0.383,
+    80.986
+   ],
+   "synthetic": [
+    0.257,
+    78.115
+   ],
+   "n_synth": 90
+  },
+  "auc_base": 0.901,
+  "auc_synth": 0.896,
+  "delta_auc": -0.005,
+  "ci": [
+   -0.126,
+   0.097
+  ],
+  "f1_base": 0.615,
+  "f1_synth": 0.615,
+  "passed": false
+ },
+ "spine_axis_tilt": {
+  "n": 99,
+  "pos": 10,
+  "stage1": {
+   "features": [
+    "axis_img_deg",
+    "axis_min_third"
+   ],
+   "real_pos": [
+    4.167,
+    3.548
+   ],
+   "real_neg": [
+    2.152,
+    1.191
+   ],
+   "synthetic": [
+    9.31,
+    4.686
+   ],
+   "n_synth": 54
+  },
+  "auc_base": 0.799,
+  "auc_synth": 0.819,
+  "delta_auc": 0.02,
+  "ci": [
+   -0.026,
+   0.098
+  ],
+  "f1_base": 0.4,
+  "f1_synth": 0.412,
+  "passed": false
+ },
+ "hip_roi_field": {
+  "n": 150,
+  "pos": 7,
+  "stage1": {
+   "features": [
+    "min_cm",
+    "frame_h_cm"
+   ],
+   "real_pos": [
+    0.0,
+    13.455
+   ],
+   "real_neg": [
+    3.64,
+    17.225
+   ],
+   "synthetic": [
+    0.683,
+    13.26
+   ],
+   "n_synth": 143
+  },
+  "auc_base": 0.827,
+  "auc_synth": 0.899,
+  "delta_auc": 0.072,
+  "ci": [
+   0.0,
+   0.181
+  ],
+  "f1_base": 0.667,
+  "f1_synth": 0.667,
+  "passed": false
+ }
+}

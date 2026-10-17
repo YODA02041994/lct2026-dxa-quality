@@ -37,6 +37,7 @@ RUN_TTL_MIN = int(os.environ.get("DXAQC_RUN_TTL_MIN", "180"))
 MAX_UPLOAD_MB = int(os.environ.get("DXAQC_MAX_UPLOAD_MB", "500"))
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 FILES_DIR = os.environ.get("DXAQC_FILES", "")            # необязательная папка с материалами (презентация, демо-запись)
+DEMO_DIR = os.environ.get("DXAQC_DEMO_DIR", os.path.join(os.path.dirname(FILES_DIR.rstrip("/")), "demo") if FILES_DIR else "")   # demo_*.dcm: прогон только на сервере
 
 app = FastAPI(title="DXA quality control", version=__version__,
               description="Контроль качества денситометрии: область → нарушение → тип (ЛЦТ-2026, задача №4)")
@@ -80,7 +81,7 @@ def health():
 @app.get("/", response_class=HTMLResponse)
 def index():
     with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
-        return f.read()
+        return HTMLResponse(f.read(), headers={"Cache-Control": "no-store"})   # после обновления стенда — сразу новая страница
 
 
 @app.get("/files/{name}")
@@ -90,6 +91,51 @@ def files(name: str):
     if not FILES_DIR or not os.path.isfile(path):
         raise HTTPException(404)
     return FileResponse(path, filename=os.path.basename(name))
+
+
+def _demo_names() -> list[str]:
+    if not DEMO_DIR or not os.path.isdir(DEMO_DIR):
+        return []
+    return sorted(n for n in os.listdir(DEMO_DIR) if n.startswith("demo_") and n.lower().endswith(".dcm"))
+
+
+@app.get("/api/demo")
+def demo_files():
+    """Имена демонстрационных снимков (demo_*.dcm в DXAQC_DEMO_DIR). Сами файлы наружу не отдаются — это материалы
+    постановщика; прогон делает сервер (POST /api/demo), результат такой же, как у обычной загрузки."""
+    return {"files": _demo_names()}
+
+
+@app.post("/api/demo")
+def demo_run(only: str = ""):
+    """Прогнать демонстрационные снимки на сервере и вернуть результат в формате /api/analyze.
+    only — подстрока имени (например, «059»: одно исследование для режима укладки)."""
+    names = [n for n in _demo_names() if not only or only in n]
+    if not names:
+        raise HTTPException(404, "на сервере нет демонстрационных снимков")
+    _cleanup()
+    run_id = time.strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:6]
+    rdir = os.path.join(RUNS_DIR, run_id)
+    inp, out = os.path.join(rdir, "input"), os.path.join(rdir, "output")
+    os.makedirs(inp)
+    for n in names:
+        shutil.copy(os.path.join(DEMO_DIR, n), os.path.join(inp, n))
+    return _finish_run(run_id, rdir, inp, out)
+
+
+def _finish_run(run_id: str, rdir: str, inp: str, out: str) -> dict:
+    with _lock:                                                   # модель одна, MPS/CUDA не любят гонки
+        rows, s = run(inp, out, predictor(), fmt="both")
+    for i, r in enumerate(rows):
+        r["n"] = i
+        r["input_path"] = os.path.join(inp, r["path_to_study"])
+    json.dump(rows, open(os.path.join(rdir, "rows.json"), "w"), ensure_ascii=False)
+    public = [{k: r[k] for k in OFFICIAL + ["side", "level", "duplicate_of", "error_message", "n"]} | {"details": json.loads(r["details"]) if r["details"] else None} for r in rows]
+    p = predictor()
+    return {"run_id": run_id, "summary": s.__dict__ | {"xlsx": f"api/runs/{run_id}/results.xlsx", "csv": f"api/runs/{run_id}/results.csv",
+                                                       "thresholds": {k: round(float(v), 3) for k, v in getattr(p, "thresholds", {}).items()},
+                                                       "soft": {k: round(float(v), 3) for k, v in (getattr(p, "soft_thresholds", None) or {}).items()}},
+            "rows": public}
 
 
 @app.post("/api/analyze")
@@ -118,14 +164,7 @@ async def analyze(files: list[UploadFile] = File(...)):
             except Exception as exc:  # noqa: BLE001
                 raise HTTPException(400, f"архив {name} не распакован: {exc}") from exc
             os.remove(path)
-    with _lock:                                                   # модель одна, MPS/CUDA не любят гонки
-        rows, s = run(inp, out, predictor(), fmt="both")
-    for i, r in enumerate(rows):
-        r["n"] = i
-        r["input_path"] = os.path.join(inp, r["path_to_study"])
-    json.dump(rows, open(os.path.join(rdir, "rows.json"), "w"), ensure_ascii=False)
-    public = [{k: r[k] for k in OFFICIAL + ["side", "duplicate_of", "error_message", "n"]} | {"details": json.loads(r["details"]) if r["details"] else None} for r in rows]
-    return {"run_id": run_id, "summary": s.__dict__ | {"xlsx": f"api/runs/{run_id}/results.xlsx", "csv": f"api/runs/{run_id}/results.csv"}, "rows": public}
+    return _finish_run(run_id, rdir, inp, out)
 
 
 def _rows(run_id: str) -> list[dict]:
@@ -189,11 +228,28 @@ def series_zip(run_id: str):
     return FileResponse(path, filename="additional_series.zip")
 
 
+@app.get("/api/runs/{run_id}/image/{n}.png")
+def image(run_id: str, n: int):
+    """Снимок n без разметки (8 бит) — миниатюры в таблице; рисуется быстро, без модели."""
+    rows = _rows(run_id)
+    if n < 0 or n >= len(rows):
+        raise HTTPException(404)
+    r = rows[n]
+    if r["processing_status"] != "Success":
+        raise HTTPException(422, r.get("error_message") or "Failure")
+    import cv2
+    ok, buf = cv2.imencode(".png", _pixels(pydicom.dcmread(r["input_path"])))
+    return Response(buf.tobytes(), media_type="image/png", headers={"Cache-Control": "private, max-age=3600"})
+
+
 @app.get("/api/runs/{run_id}/overlay/{n}.png")
 def overlay(run_id: str, n: int):
     rows = _rows(run_id)
     if n < 0 or n >= len(rows):
         raise HTTPException(404)
+    cache = os.path.join(RUNS_DIR, run_id, "overlay_cache", f"{n}.png")       # первый показ рисует, дальше — из файла
+    if os.path.isfile(cache):
+        return FileResponse(cache, media_type="image/png")
     r = rows[n]
     if r["processing_status"] != "Success":
         raise HTTPException(422, r.get("error_message") or "Failure")
@@ -203,7 +259,11 @@ def overlay(run_id: str, n: int):
     bgr = draw_overlay(img, r["anatomical_region"], details,
                        {"quality_class": r["quality_class"], "violation_type": r["violation_type"], "quality_prob": r["quality_prob"]},
                        predictor().thresholds)
-    return Response(encode_png(bgr), media_type="image/png")
+    png = encode_png(bgr)
+    os.makedirs(os.path.dirname(cache), exist_ok=True)
+    with open(cache, "wb") as f:
+        f.write(png)
+    return Response(png, media_type="image/png")
 
 
 @app.exception_handler(Exception)

@@ -38,3 +38,15 @@ threadpoolctl==3.7.0
 typing-inspection==0.4.4
 typing_extensions==4.16.0
 uvicorn==0.54.0
+# --- FleXray (необязательный модуль сколиоз/область; веса CC-BY-NC-4.0) и его зависимости ---
+flexray==1.0.2
+huggingface_hub==0.36.2
+safetensors==0.5.2
+PyYAML==6.0.1
+hf-xet==1.5.1
+packaging==24.1
+requests==2.34.2
+tqdm==4.67.3
+charset-normalizer==3.3.2
+urllib3==2.5.0
+certifi==2025.11.12

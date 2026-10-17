@@ -6,7 +6,7 @@
 # базовый образ зафиксирован по контрольной сумме (python 3.12-slim, Debian bookworm)
 FROM python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 \
-    OMP_NUM_THREADS=4 DXAQC_WEIGHTS=/app/weights PYTHONPATH=/app/src
+    OMP_NUM_THREADS=4 DXAQC_WEIGHTS=/app/weights PYTHONPATH=/app/src HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1
 RUN apt-get update && apt-get install -y --no-install-recommends libglib2.0-0 libgl1 && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 # точные версии всех библиотек — requirements.lock; PyTorch для CPU ставится из своего индекса

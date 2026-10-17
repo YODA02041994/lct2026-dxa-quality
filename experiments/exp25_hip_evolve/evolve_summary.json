@@ -1,0 +1,121 @@
+{
+ "base_search": {
+  "part": "search",
+  "n": 91,
+  "pos": 22,
+  "base_auc": 0.8432,
+  "auc": 0.8432,
+  "geom_alone_auc": NaN,
+  "features": []
+ },
+ "final": [
+  {
+   "search": {
+    "part": "search",
+    "n": 91,
+    "pos": 22,
+    "base_auc": 0.8432,
+    "auc": 0.9144,
+    "geom_alone_auc": 0.7233,
+    "features": [
+     "gt_off_neckline",
+     "lt_protrude_over_shaftw",
+     "lt_row_w_over_shaft_w",
+     "lt_row_w_over_up_w"
+    ]
+   },
+   "holdout": {
+    "part": "holdout",
+    "n": 59,
+    "pos": 14,
+    "base_auc": 0.9095,
+    "auc": 0.8111,
+    "delta": -0.0984,
+    "ci": [
+     -0.2282,
+     -0.0026
+    ],
+    "features": [
+     "gt_off_neckline",
+     "lt_protrude_over_shaftw",
+     "lt_row_w_over_shaft_w",
+     "lt_row_w_over_up_w"
+    ]
+   },
+   "code": "def extra(lm, img, side, h, w):\n    out = {}\n    try:\n        def pt(name):\n            v = lm.get(name)\n            if v is None:\n                return None\n            x, y = float(v[0]), float(v[1])\n            if not (math.isfinite(x) and math.isfinite(y)):\n                return None\n            return (x, y)\n\n        head = pt('head')\n        ns = pt('neck_sup')\n        ni = pt('neck_inf')\n        st = pt('shaft_top')\n        sb = pt('shaft_bot')\n        gt_lat = pt('gt_lat')\n        gt_top = pt('gt_top')\n        lt_tip = pt('lt_tip')\n        lt_up = pt('lt_up')\n        lt_down = pt('lt_down')\n\n        def row_width(cy, cx_hint, thresh_rel):\n            y = int(round(cy))\n            if y < 0 or y >= h:\n                return None\n            row = img[y]\n            mx = 0.0\n            for xx in range(w):\n                v = float(row[xx])\n                if v > mx:\n                    mx = v\n            if mx <= 1.0:\n                return None\n            thr = mx * thresh_rel\n            cx = int(round(cx_hint))\n            if cx < 0: cx = 0\n            if cx >= w: cx = w - 1\n            if float(row[cx]) < thr:\n                found = -1\n                for d in range(1, w):\n                    if cx - d >= 0 and float(row[cx - d]) >= thr:\n                        found = cx - d; break\n                    if cx + d < w and float(row[cx + d]) >= thr:\n                        found = cx + d; break\n                if found < 0:\n                    return None\n                cx = found\n            left = cx\n            while left > 0 and float(row[left - 1]) >= thr:\n                left -= 1\n            right = cx\n            while right < w - 1 and float(row[right + 1]) >= thr:\n                right += 1\n            return float(right - left + 1)\n\n        def shaft_width_at(y_target):\n            if st is None or sb is None:\n                return None\n            dy = sb[1] - st[1]\n            t = 0.0\n            if abs(dy) > 1e-3:\n                t = (y_target - st[1]) / dy\n                if t < 0.0: t = 0.0\n                if t > 1.0: t = 1.0\n            cx_shaft = st[0] + t * (sb[0] - st[0])\n            return row_width(y_target, cx_shaft, 0.35)\n\n        # 1) ширина костной полосы на уровне lt_tip к ширине диафиза\n        if lt_tip is not None and st is not None and sb is not None:\n            w_lt = row_width(lt_tip[1], lt_tip[0], 0.35)\n            y_shaft = 0.5 * (st[1] + sb[1])\n            w_sh = shaft_width_at(y_shaft)\n            if w_lt is not None and w_sh is not None and w_sh > 1e-3:\n                out['lt_row_w_over_shaft_w'] = float(w_lt / w_sh)\n\n        # 2) относительное удлинение полосы на уровне lt_tip к полосе чуть выше (lt_up)\n        if lt_tip is not None and lt_up is not None:\n            w_lt = row_width(lt_tip[1], lt_tip[0], 0.35)\n            w_up = row_width(lt_up[1], lt_up[0], 0.35)\n            if w_lt is not None and w_up is not None and w_up > 1e-3:\n                out['lt_row_w_over_up_w'] = float(w_lt / w_up)\n\n        # 3) смещение gt_lat от линии head-neck_mid\n        if head is not None and ns is not None and ni is not None and gt_lat is not None:\n            mx = 0.5 * (ns[0] + ni[0])\n            my = 0.5 * (ns[1] + ni[1])\n            ax, ay = head[0], head[1]\n            bx, by = mx, my\n            dx, dy = bx - ax, by - ay\n            L = math.hypot(dx, dy)\n            neck_w = math.hypot(ns[0] - ni[0], ns[1] - ni[1])\n            if L > 1e-3 and neck_w > 1e-3:\n                px, py = gt_lat[0] - ax, gt_lat[1] - ay\n                cross = abs(dx * py - dy * px) / L\n                out['gt_off_neckline'] = float(cross / neck_w)\n\n        # 4) выступание lt_tip за линию lt_up-lt_down, в долях ширины диафиза\n        if lt_tip is not None and lt_up is not None and lt_down is not None:\n            ax, ay = lt_up[0], lt_up[1]\n            bx, by = lt_down[0], lt_down[1]\n            dx, dy = bx - ax, by - ay\n            L = math.hypot(dx, dy)\n            if L > 1e-3:\n                # расстояние от lt_tip до прямой lt_up-lt_down\n                px, py = lt_tip[0] - ax, lt_tip[1] - ay\n                cross = (dx * py - dy * px) / L\n                dist = abs(cross)\n                # ширина диафиза на уровне lt_tip\n                w_sh = shaft_width_at(lt_tip[1])\n                if w_sh is not None and w_sh > 1e-3:\n                    out['lt_protrude_over_shaftw'] = float(dist / w_sh)\n\n    except Exception:\n        pass\n\n    res = {}\n    for k, v in out.items():\n        if isinstance(v, float) and math.isfinite(v):\n            res[k] = v\n    return res"
+  },
+  {
+   "search": {
+    "part": "search",
+    "n": 91,
+    "pos": 22,
+    "base_auc": 0.8432,
+    "auc": 0.8959,
+    "geom_alone_auc": 0.7101,
+    "features": [
+     "gt_off_neckline",
+     "lt_row_w_over_shaft_w",
+     "lt_row_w_over_up_w",
+     "neck_len_over_neckw"
+    ]
+   },
+   "holdout": {
+    "part": "holdout",
+    "n": 59,
+    "pos": 14,
+    "base_auc": 0.9095,
+    "auc": 0.8175,
+    "delta": -0.0921,
+    "ci": [
+     -0.2006,
+     -0.0094
+    ],
+    "features": [
+     "gt_off_neckline",
+     "lt_row_w_over_shaft_w",
+     "lt_row_w_over_up_w",
+     "neck_len_over_neckw"
+    ]
+   },
+   "code": "def extra(lm, img, side, h, w):\n    out = {}\n    try:\n        def pt(name):\n            v = lm.get(name)\n            if v is None:\n                return None\n            x, y = float(v[0]), float(v[1])\n            if not (math.isfinite(x) and math.isfinite(y)):\n                return None\n            return (x, y)\n\n        head = pt('head')\n        ns = pt('neck_sup')\n        ni = pt('neck_inf')\n        st = pt('shaft_top')\n        sb = pt('shaft_bot')\n        gt_lat = pt('gt_lat')\n        gt_top = pt('gt_top')\n        lt_tip = pt('lt_tip')\n        lt_up = pt('lt_up')\n        lt_down = pt('lt_down')\n\n        def mean_bright(cx, cy, r):\n            x0 = int(max(0, math.floor(cx - r)))\n            x1 = int(min(w - 1, math.ceil(cx + r)))\n            y0 = int(max(0, math.floor(cy - r)))\n            y1 = int(min(h - 1, math.ceil(cy + r)))\n            if x1 <= x0 or y1 <= y0:\n                return None\n            s = 0.0\n            n = 0\n            for yy in range(y0, y1 + 1):\n                for xx in range(x0, x1 + 1):\n                    v = float(img[yy, xx])\n                    if v > 0.0:\n                        s += v\n                        n += 1\n            if n < 4:\n                return None\n            return s / n\n\n        def row_width(cy, cx_hint, thresh_rel):\n            # ширина костной полосы в строке cy около cx_hint по порогу от максимума строки\n            y = int(round(cy))\n            if y < 0 or y >= h:\n                return None\n            row = img[y]\n            mx = 0.0\n            for xx in range(w):\n                v = float(row[xx])\n                if v > mx:\n                    mx = v\n            if mx <= 1.0:\n                return None\n            thr = mx * thresh_rel\n            cx = int(round(cx_hint))\n            if cx < 0: cx = 0\n            if cx >= w: cx = w - 1\n            # найти ближайший к cx пиксель выше порога\n            if float(row[cx]) < thr:\n                found = -1\n                for d in range(1, w):\n                    if cx - d >= 0 and float(row[cx - d]) >= thr:\n                        found = cx - d; break\n                    if cx + d < w and float(row[cx + d]) >= thr:\n                        found = cx + d; break\n                if found < 0:\n                    return None\n                cx = found\n            left = cx\n            while left > 0 and float(row[left - 1]) >= thr:\n                left -= 1\n            right = cx\n            while right < w - 1 and float(row[right + 1]) >= thr:\n                right += 1\n            return float(right - left + 1)\n\n        # 1) ширина костной полосы на уровне lt_tip к ширине диафиза\n        if lt_tip is not None and st is not None and sb is not None:\n            w_lt = row_width(lt_tip[1], lt_tip[0], 0.35)\n            # ширина диафиза чуть ниже st и выше sb\n            y_shaft = 0.5 * (st[1] + sb[1])\n            # cx диафиза на этой высоте — интерполяция по x st..sb\n            t = 0.0\n            dy = sb[1] - st[1]\n            if abs(dy) > 1e-3:\n                t = (y_shaft - st[1]) / dy\n                if t < 0.0: t = 0.0\n                if t > 1.0: t = 1.0\n            cx_shaft = st[0] + t * (sb[0] - st[0])\n            w_sh = row_width(y_shaft, cx_shaft, 0.35)\n            if w_lt is not None and w_sh is not None and w_sh > 1e-3:\n                out['lt_row_w_over_shaft_w'] = float(w_lt / w_sh)\n\n        # 2) относительное удлинение полосы на уровне lt_tip к полосе чуть выше (lt_up)\n        if lt_tip is not None and lt_up is not None:\n            w_lt = row_width(lt_tip[1], lt_tip[0], 0.35)\n            w_up = row_width(lt_up[1], lt_up[0], 0.35)\n            if w_lt is not None and w_up is not None and w_up > 1e-3:\n                out['lt_row_w_over_up_w'] = float(w_lt / w_up)\n\n        # 3) длина шейки к ширине шейки\n        if head is not None and ns is not None and ni is not None:\n            mx = 0.5 * (ns[0] + ni[0])\n            my = 0.5 * (ns[1] + ni[1])\n            neck_len = math.hypot(mx - head[0], my - head[1])\n            neck_w = math.hypot(ns[0] - ni[0], ns[1] - ni[1])\n            if neck_w > 1e-3:\n                out['neck_len_over_neckw'] = float(neck_len / neck_w)\n\n        # 4) смещение gt_lat от линии head-neck_mid\n        if head is not None and ns is not None and ni is not None and gt_lat is not None:\n            mx = 0.5 * (ns[0] + ni[0])\n            my = 0.5 * (ns[1] + ni[1])\n            ax, ay = head[0], head[1]\n            bx, by = mx, my\n            dx, dy = bx - ax, by - ay\n            L = math.hypot(dx, dy)\n            neck_w = math.hypot(ns[0] - ni[0], ns[1] - ni[1])\n            if L > 1e-3 and neck_w > 1e-3:\n                px, py = gt_lat[0] - ax, gt_lat[1] - ay\n                cross = abs(dx * py - dy * px) / L\n                out['gt_off_neckline'] = float(cross / neck_w)\n\n    except Exception:\n        pass\n\n    res = {}\n    for k, v in out.items():\n        if isinstance(v, float) and math.isfinite(v):\n            res[k] = v\n    return res"
+  },
+  {
+   "search": {
+    "part": "search",
+    "n": 91,
+    "pos": 22,
+    "base_auc": 0.8432,
+    "auc": 0.8906,
+    "geom_alone_auc": 0.5909,
+    "features": [
+     "gt_off_neckline",
+     "lt_tip_bright_over_shaft",
+     "lt_tip_contrast",
+     "neck_len_over_neckw"
+    ]
+   },
+   "holdout": {
+    "part": "holdout",
+    "n": 59,
+    "pos": 14,
+    "base_auc": 0.9095,
+    "auc": 0.7365,
+    "delta": -0.173,
+    "ci": [
+     -0.2772,
+     -0.0876
+    ],
+    "features": [
+     "gt_off_neckline",
+     "lt_tip_bright_over_shaft",
+     "lt_tip_contrast",
+     "neck_len_over_neckw"
+    ]
+   },
+   "code": "def extra(lm, img, side, h, w):\n    out = {}\n    try:\n        def pt(name):\n            v = lm.get(name)\n            if v is None:\n                return None\n            x, y = float(v[0]), float(v[1])\n            if not (math.isfinite(x) and math.isfinite(y)):\n                return None\n            return (x, y)\n\n        head = pt('head')\n        ns = pt('neck_sup')\n        ni = pt('neck_inf')\n        st = pt('shaft_top')\n        sb = pt('shaft_bot')\n        gt_lat = pt('gt_lat')\n        gt_top = pt('gt_top')\n        lt_tip = pt('lt_tip')\n        lt_up = pt('lt_up')\n        lt_down = pt('lt_down')\n\n        def mean_bright(cx, cy, r):\n            x0 = int(max(0, math.floor(cx - r)))\n            x1 = int(min(w - 1, math.ceil(cx + r)))\n            y0 = int(max(0, math.floor(cy - r)))\n            y1 = int(min(h - 1, math.ceil(cy + r)))\n            if x1 <= x0 or y1 <= y0:\n                return None\n            s = 0.0\n            n = 0\n            for yy in range(y0, y1 + 1):\n                for xx in range(x0, x1 + 1):\n                    v = float(img[yy, xx])\n                    if v > 0.0:\n                        s += v\n                        n += 1\n            if n < 4:\n                return None\n            return s / n\n\n        # 1) длина шейки к ширине шейки\n        if head is not None and ns is not None and ni is not None:\n            mx = 0.5 * (ns[0] + ni[0])\n            my = 0.5 * (ns[1] + ni[1])\n            neck_len = math.hypot(mx - head[0], my - head[1])\n            neck_w = math.hypot(ns[0] - ni[0], ns[1] - ni[1])\n            if neck_w > 1e-3:\n                out['neck_len_over_neckw'] = float(neck_len / neck_w)\n\n        # 2) длина шейки к длине диафиза\n        if head is not None and ns is not None and ni is not None and st is not None and sb is not None:\n            mx = 0.5 * (ns[0] + ni[0])\n            my = 0.5 * (ns[1] + ni[1])\n            neck_len = math.hypot(mx - head[0], my - head[1])\n            shaft_len = math.hypot(sb[0] - st[0], sb[1] - st[1])\n            if shaft_len > 1e-3:\n                out['neck_len_over_shaftlen'] = float(neck_len / shaft_len)\n\n        # 3) угол шейка-диафиз\n        if head is not None and ns is not None and ni is not None and st is not None and sb is not None:\n            mx = 0.5 * (ns[0] + ni[0])\n            my = 0.5 * (ns[1] + ni[1])\n            vx1, vy1 = mx - head[0], my - head[1]\n            vx2, vy2 = sb[0] - st[0], sb[1] - st[1]\n            n1 = math.hypot(vx1, vy1)\n            n2 = math.hypot(vx2, vy2)\n            if n1 > 1e-3 and n2 > 1e-3:\n                c = (vx1 * vx2 + vy1 * vy2) / (n1 * n2)\n                if c > 1.0: c = 1.0\n                if c < -1.0: c = -1.0\n                out['neck_shaft_angle'] = float(math.acos(c))\n\n        # 4) смещение gt_lat от линии head-neck_mid\n        if head is not None and ns is not None and ni is not None and gt_lat is not None:\n            mx = 0.5 * (ns[0] + ni[0])\n            my = 0.5 * (ns[1] + ni[1])\n            ax, ay = head[0], head[1]\n            bx, by = mx, my\n            dx, dy = bx - ax, by - ay\n            L = math.hypot(dx, dy)\n            neck_w = math.hypot(ns[0] - ni[0], ns[1] - ni[1])\n            if L > 1e-3 and neck_w > 1e-3:\n                px, py = gt_lat[0] - ax, gt_lat[1] - ay\n                cross = abs(dx * py - dy * px) / L\n                out['gt_off_neckline'] = float(cross / neck_w)\n\n        # 5) яркость вокруг lt_tip относительно яркости диафиза\n        if lt_tip is not None and st is not None and sb is not None:\n            # радиус окна: ~ половина ширины диафиза, но не меньше 3 px\n            shaft_len = math.hypot(sb[0] - st[0], sb[1] - st[1])\n            # оценка ширины диафиза: расстояние от st до sb вертикально не даёт ширины,\n            # берём типичную ширину диафиза как долю от длины (эвристика ~0.35)\n            r = max(3.0, 0.25 * shaft_len / max(1.0, abs(sb[1] - st[1]) + 1.0) * 20.0)\n            r = min(r, 12.0)\n            b_lt = mean_bright(lt_tip[0], lt_tip[1], r)\n            # фон диафиза: середина между st и sb\n            mx_s = 0.5 * (st[0] + sb[0])\n            my_s = 0.5 * (st[1] + sb[1])\n            b_sh = mean_bright(mx_s, my_s, r * 0.6)\n            if b_lt is not None and b_sh is not None and b_sh > 1e-3:\n                out['lt_tip_bright_over_shaft'] = float(b_lt / b_sh)\n\n        # 6) яркость lt_tip относительно окна вокруг lt_up/lt_down (контраст бугорка)\n        if lt_tip is not None and (lt_up is not None or lt_down is not None):\n            ref = lt_up if lt_up is not None else lt_down\n            r = 6.0\n            b_tip = mean_bright(lt_tip[0], lt_tip[1], r)\n            b_ref = mean_bright(ref[0], ref[1], r)\n            if b_tip is not None and b_ref is not None and b_ref > 1e-3:\n                out['lt_tip_contrast'] = float(b_tip / b_ref)\n\n    except Exception:\n        pass\n\n    res = {}\n    for k, v in out.items():\n        if isinstance(v, float) and math.isfinite(v):\n            res[k] = v\n    return res"
+  }
+ ],
+ "passed": false,
+ "usd": 0.0232,
+ "calls": 32
+}

@@ -80,7 +80,21 @@ class LandmarkPredictor(Predictor):
         if mode != "competition" and mode in cj.get("modes", {}):
             self.thresholds = {c: float(t) for c, t in cj["modes"][mode].items()}
         self.mode = mode
+        # мягкие пороги (чувствительность ≥ 0,8 по критерию) — зона «проверить укладку» между нормой и «переснять»
+        soft = (cj.get("modes") or {}).get("soft")
+        self.soft_thresholds = {c: float(t) for c, t in soft.items()} if isinstance(soft, dict) else None
+        from .fxr_seg import FlexraySeg
+        self.fxr = FlexraySeg(weights_dir)                             # необязательный модуль; без весов — ok = False
         self._last: dict = {}
+
+    def fxr_region(self, img: np.ndarray) -> str | None:
+        """Голос FleXray за область (None — модуль выключен или скелета в кадре нет)."""
+        if not getattr(self, "fxr", None) or not self.fxr.ok:
+            return None
+        try:
+            return self.fxr.region_vote(img)
+        except Exception:  # noqa: BLE001
+            return None
 
     def predict_flags(self, img, region, side):
         from .criteria import hip_features, spine_features
@@ -93,6 +107,11 @@ class LandmarkPredictor(Predictor):
                 om, boxes = self.objmap.features(img)
                 cnn.update(om)
             feats = spine_features(lm, h, w, img, cnn)
+            if getattr(self, "fxr", None) and self.fxr.ok and self.fxr.has_cached(img):   # только если FleXray уже запускали
+                try:
+                    feats.update(self.fxr.spine_features(img))
+                except Exception:  # noqa: BLE001
+                    pass
         else:
             boxes = []
             lm = self.loc["hip"].predict(img, side)
@@ -102,13 +121,47 @@ class LandmarkPredictor(Predictor):
         from .criteria import explain
         from .labels import pixel_mm
         from .roi import propose
-        comment, advice = explain(region, feats, probs, self.thresholds)
+        scol = None
+        if region == REGION_SPINE:                                     # сколиоз — отдельно от критериев (scoliosis.py)
+            from .scoliosis import damp_axis, measure
+            scol = measure(lm, pixel_mm(w))
+            probs, scol["axis_damped"] = damp_axis(probs, scol["grade"])
+            feats["scol_bend_deg"] = scol["bend_deg"] if scol["bend_deg"] is not None else 0.0
+            feats["scol_dev_mm"] = scol["dev_mm"] if scol["dev_mm"] is not None else 0.0
+        comment, advice = explain(region, feats, probs, self.thresholds, getattr(self, "soft_thresholds", None))
         roi = propose("spine" if region == REGION_SPINE else "hip", lm, img, pixel_mm(w))   # предложение разметки областей измерения
-        self._last = {"landmarks": lm, "features": feats, "probs": probs, "comment": comment, "advice": advice, "objects": boxes, "roi": roi}
+        self._last = {"landmarks": lm, "features": feats, "probs": probs, "comment": comment, "advice": advice, "objects": boxes, "roi": roi,
+                      "scoliosis": scol}
         return probs
 
     def explain(self) -> dict:
         return dict(self._last)
+
+    # Анатомическая «линейка» — медианы по разметке врачей на обучающем наборе (масштаб 0,60/0,65 мм известен, docs/05, эксп. 27):
+    # расстояние между центрами соседних тел L1–L5 — 31,1 мм (CV 8 %); бедро: центр головки → верхушка большого вертела 56,8 мм,
+    # → малый вертел 64,0 мм, → седалищный бугор 60,0 мм (CV 12 % каждое).
+    RULER_SPINE_MM = 31.1
+    RULER_HIP_MM = {("head", "gt_top"): 56.8, ("head", "lt_tip"): 64.0, ("head", "ischium"): 60.0}
+
+    def anatomical_mm(self, img: np.ndarray, region: str) -> float | None:
+        """Масштаб кадра по анатомии — только для кадров нестандартной ширины без тегов масштаба (другой аппарат).
+        Точность ±10 %: размеры тела у людей разные. None — уверенных ориентиров мало."""
+        from .region import hip_side
+        if region == REGION_SPINE:
+            lm = self.loc["spine"].predict(img)
+            pts = [(lm[k]["x"], lm[k]["y"]) for k in ("L1", "L2", "L3", "L4", "L5") if k in lm and lm[k].get("conf", 0) >= 0.5]
+            if len(pts) < 3:
+                return None
+            d = [math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]) for i in range(len(pts) - 1)]
+            return self.RULER_SPINE_MM / float(np.median(d)) if np.median(d) > 1 else None
+        lm = self.loc["hip"].predict(img, hip_side(img).side)
+        est = []
+        for (a, b), ref in self.RULER_HIP_MM.items():
+            if a in lm and b in lm and min(lm[a].get("conf", 0), lm[b].get("conf", 0)) >= 0.5:
+                d = math.hypot(lm[a]["x"] - lm[b]["x"], lm[a]["y"] - lm[b]["y"])
+                if d > 1:
+                    est.append(ref / d)
+        return float(np.median(est)) if est else None
 
     def guess_region(self, img: np.ndarray, floor: float = 0.30) -> str | None:
         """Область для кадра нестандартной ширины: у какого локализатора выше средняя уверенность ориентиров.
@@ -141,6 +194,8 @@ class Verdict:
     flag_probs: dict[str, float] = field(default_factory=dict)
     needs_review: bool = False                        # хотя бы один критерий у порога: решение стоит проверить глазами
     review_flags: list[str] = field(default_factory=list)
+    level: str = "ok"                                 # три уровня для лаборанта: repeat (= quality_class 1) · check · ok
+    check_flags: list[str] = field(default_factory=list)   # критерии, прошедшие мягкий порог (зона «проверить укладку»)
 
 
 def relative_prob(p: float, threshold: float) -> float:
@@ -152,7 +207,8 @@ def relative_prob(p: float, threshold: float) -> float:
     return 1.0 / (1.0 + math.exp(-z))
 
 
-def aggregate(flag_probs: dict[str, float], thresholds: dict[str, float] | None = None) -> Verdict:
+def aggregate(flag_probs: dict[str, float], thresholds: dict[str, float] | None = None,
+              soft_thresholds: dict[str, float] | None = None) -> Verdict:
     """Вероятности критериев → итог по снимку.
 
     quality_class = 1, если хотя бы один критерий не ниже своего порога (правило организатора: любое
@@ -166,6 +222,12 @@ def aggregate(flag_probs: dict[str, float], thresholds: dict[str, float] | None 
     if any(positive.values()):                       # защита от округления на самой границе порога
         prob = max(prob, 0.5)
     near = [f for f, p in flag_probs.items() if abs(p - thresholds.get(f, DEFAULT_THRESHOLD)) < REVIEW_BAND]
+    # Три уровня выдачи (консультация 16.10, сценарий «помощь лаборанту»): «переснять» — порог критерия пройден;
+    # «проверить укладку» — критерий выше мягкого порога (чувствительность ≥ 0,8 вне обучения) или у порога; иначе «в норме».
+    # quality_class и quality_prob от этого не меняются — официальный ответ остаётся прежним.
+    soft = soft_thresholds or {}
+    check = [f for f, p in flag_probs.items() if not positive[f] and (p >= soft.get(f, 2.0) or f in near)]
+    level = "repeat" if any(positive.values()) else "check" if check else "ok"
     return Verdict(
         quality_class=int(any(positive.values())),
         violation_type=violation_string(positive),
@@ -173,4 +235,6 @@ def aggregate(flag_probs: dict[str, float], thresholds: dict[str, float] | None 
         flag_probs=dict(flag_probs),
         needs_review=bool(near),
         review_flags=near,
+        level=level,
+        check_flags=check,
     )

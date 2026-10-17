@@ -280,7 +280,7 @@ class Localizer:
 
     def __init__(self, kind: str, weights: str, device: str | None = None, absent_thr: float = 0.3):
         self.kind, self.names = kind, LM[kind]
-        self.device = device or ("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
+        self.device = device or os.environ.get("DXAQC_DEVICE") or ("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
         ck = torch.load(weights, map_location="cpu")
         sds = ck.get("state_dicts") or [ck["state_dict"]]
         self.nets = []
@@ -298,7 +298,17 @@ class Localizer:
 
     @torch.no_grad()
     def predict(self, img: np.ndarray, side: str | None = None) -> dict:
-        """img uint8 HxW исходника. Для бедра side='L' → отражение туда и обратно."""
+        """img uint8 HxW исходника. Для бедра side='L' → отражение туда и обратно.
+        Последний ответ запоминается: голосование за область (guess_region) и разбор критериев (predict_flags)
+        вызывают локализатор на том же снимке — второй проход не нужен, ответ тот же (детерминированная сеть)."""
+        key = (hash(img.tobytes()), img.shape, side)
+        if getattr(self, "_last_key", None) == key:
+            return {k: dict(v) for k, v in self._last_out.items()}
+        out = self._predict(img, side)
+        self._last_key, self._last_out = key, {k: dict(v) for k, v in out.items()}
+        return out
+
+    def _predict(self, img: np.ndarray, side: str | None = None) -> dict:
         h, w = img.shape
         flip = self.kind == "hip" and side == "L"
         if flip:
