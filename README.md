@@ -51,10 +51,13 @@ git clone https://github.com/YODA02041994/lct2026-dxa-quality && cd lct2026-dxa-
 То же без скрипта: `scripts/download_weights.sh && docker build -t dxaqc . &&
 docker run --rm -v "$PWD/in:/in" -v "$PWD/out:/out" dxaqc run -i /in -o /out --overlays --sr`.
 
-Без сборки: готовый образ linux/amd64 лежит в Release `v1.0.0-image` (архив 1,4 ГБ, рядом файл с контрольной суммой):
+Без сборки: готовый образ linux/amd64 версии 1.1.0 лежит в Release `v1.1.0-image` (архив 1,8 ГБ, рядом файл с контрольной суммой).
+Образ собран из чистого клона `main` с весами, скачанными без авторизации, и проверен без сети:
 
 ```bash
-curl -LO https://github.com/YODA02041994/lct2026-dxa-quality/releases/download/v1.0.0-image/dxaqc_amd64.tar.gz
+curl -LO https://github.com/YODA02041994/lct2026-dxa-quality/releases/download/v1.1.0-image/dxaqc_amd64.tar.gz
+curl -LO https://github.com/YODA02041994/lct2026-dxa-quality/releases/download/v1.1.0-image/dxaqc_amd64.tar.gz.sha256
+shasum -a 256 -c dxaqc_amd64.tar.gz.sha256
 gunzip -c dxaqc_amd64.tar.gz | docker load
 docker run --rm --network none -v "$PWD/in:/in" -v "$PWD/out:/out" dxaqc run -i /in -o /out --overlays --sr
 ```
@@ -85,7 +88,7 @@ scripts/          скачивание данных и весов, обучен�
 experiments/      скрипты экспериментов, в том числе отклонённых (журнал 21 эксперимента — docs/05, docs/08)
 tests/            автотесты (pytest)
 docs/             разбор ТЗ, аудит данных, ответы постановщика, архитектура, журнал экспериментов, руководства
-presentation/     скрипты сборки презентации и рисунки; PDF — на стенде и в Release `v1.0.0-image`
+presentation/     скрипты сборки презентации и рисунки; PDF — на стенде
 tools/labeler/    веб-инструмент разметки ориентиров, которым команда разметила 252 снимка
 run.sh            сборка и запуск контейнера одним скриптом
 docker/, Dockerfile, Dockerfile.cuda, docker-compose.yml, requirements*.txt, requirements.lock
@@ -98,7 +101,7 @@ docker/, Dockerfile, Dockerfile.cuda, docker-compose.yml, requirements*.txt, req
 | Процессор | 2 ядра x86-64 | 8 ядер |
 | Память | 6 ГБ | 16 ГБ |
 | GPU | не требуется | не требуется; вариант образа для NVIDIA — `Dockerfile.cuda` (на GPU не проверялся) |
-| Диск | 5 ГБ (веса 0,9 ГБ; образ 2,8 ГБ, в архиве 1,4 ГБ) | 10 ГБ |
+| Диск | 6 ГБ (веса 1,3 ГБ; образ около 3,2 ГБ, в архиве 1,8 ГБ) | 10 ГБ |
 | ОС | Linux с Docker 24+ | то же |
 
 Зависимости: Python 3.12, PyTorch 2.4 (CPU), torchvision, numpy, OpenCV, pydicom, scikit-learn, openpyxl, FastAPI, uvicorn,
@@ -106,7 +109,8 @@ docker/, Dockerfile, Dockerfile.cuda, docker-compose.yml, requirements*.txt, req
 Образ собирается по точным версиям из `requirements.lock`; PyTorch 2.4.1 и torchvision 0.19.1 для CPU заданы в `Dockerfile`;
 базовый образ `python:3.12-slim` зафиксирован по контрольной сумме. Диапазоны версий для разработки — `requirements.txt`.
 
-Время обработки: 3 снимка — 7–15 с в контейнере на CPU, 4–6 с на сервере с 2 ядрами в экономном режиме (полный цикл через HTTP);
+Время обработки: 3 снимка — 7,7 с, 11 снимков — 23 с в контейнере amd64 со всеми сетями без сети (эмуляция на Mac, замер 17.10);
+3 снимка — 8,6 с на сервере с 2 ядрами в экономном режиме (полный цикл через HTTP);
 499 файлов (252 уникальных снимка) — около минуты на ноутбуке с GPU.
 Требование ТЗ (≤ 3 мин на исследование) выполняется с запасом на минимальной конфигурации.
 

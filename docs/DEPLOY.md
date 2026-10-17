@@ -6,7 +6,7 @@
 git clone https://github.com/YODA02041994/lct2026-dxa-quality && cd lct2026-dxa-quality
 ./run.sh build                       # то же одной командой: веса из Release и сборка образа
 # или по шагам:
-scripts/download_weights.sh          # 18 файлов, 0,9 ГБ, нужен интернет; curl или авторизованный gh
+scripts/download_weights.sh          # 18 файлов модели и 4 файла FleXray, 1,3 ГБ; нужен интернет, curl или авторизованный gh
 docker build -t dxaqc .
 docker run --rm dxaqc python -c "from dxaqc.predict import load_default_predictor as l; print(l().name)"   # → landmarks
 docker run --rm -v "$PWD/in:/in" -v "$PWD/out:/out" dxaqc run -i /in -o /out
