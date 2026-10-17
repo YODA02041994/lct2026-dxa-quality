@@ -32,6 +32,7 @@ class FlexraySeg:
 
     def __init__(self, weights_dir: str, device: str = "cpu"):
         self.ok = False
+        self._cache: tuple[int, dict] | None = None
         self.path = os.path.join(weights_dir, "flexray")
         if not os.path.exists(os.path.join(self.path, "model.safetensors")):
             return
@@ -44,7 +45,6 @@ class FlexraySeg:
             self.ok = True
         except Exception as exc:  # noqa: BLE001 — модуль необязательный
             log.warning("FleXray выключен: %s", exc)
-        self._cache: tuple[int, dict] | None = None
 
     def probs(self, img: np.ndarray) -> dict[str, np.ndarray]:
         """→ {структура: вероятности 0..1 в размере снимка} для структур KEEP."""
@@ -66,6 +66,10 @@ class FlexraySeg:
         out = {k: p[i] for i, k in enumerate(KEEP)}
         self._cache = (key, out)
         return out
+
+    def has_cached(self, img: np.ndarray) -> bool:
+        """Сегментация этого снимка уже посчитана (FleXray спрашивали за область) — признаки можно взять бесплатно."""
+        return bool(self._cache) and self._cache[0] == hash(img.tobytes())
 
     @staticmethod
     def _area(p: np.ndarray) -> float:

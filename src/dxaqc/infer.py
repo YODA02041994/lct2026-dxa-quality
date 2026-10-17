@@ -128,7 +128,10 @@ def process_file(path: str, root: str, predictor: Predictor, cache: dict) -> dic
         # область — по анатомии (локализаторы, при наличии FleXray), ширина кадра — подсказка (region.decide_region)
         region_w = region_by_width(int(img.shape[1]))
         region_loc = predictor.guess_region(img) if hasattr(predictor, "guess_region") else None
-        region_fx = predictor.fxr_region(img) if hasattr(predictor, "fxr_region") else None
+        # FleXray — третий голос и самый дорогой (3,4 с на снимок на сервере с 2 ядрами): спрашиваем, только когда локализаторы
+        # не уверены или спорят с шириной кадра. На стандартных снимках решение то же, на чужих аппаратах он и решает (эксп. 29)
+        need_fx = region_loc is None or (region_w is not None and region_loc != region_w)
+        region_fx = predictor.fxr_region(img) if need_fx and hasattr(predictor, "fxr_region") else None
         region, region_by, region_agree = decide_region(region_w, region_loc, region_fx)
         if region is None:
             raise ValueError(f"unsupported_image: кадр {img.shape[0]}×{img.shape[1]} — скелет поясничного отдела "

@@ -298,7 +298,17 @@ class Localizer:
 
     @torch.no_grad()
     def predict(self, img: np.ndarray, side: str | None = None) -> dict:
-        """img uint8 HxW исходника. Для бедра side='L' → отражение туда и обратно."""
+        """img uint8 HxW исходника. Для бедра side='L' → отражение туда и обратно.
+        Последний ответ запоминается: голосование за область (guess_region) и разбор критериев (predict_flags)
+        вызывают локализатор на том же снимке — второй проход не нужен, ответ тот же (детерминированная сеть)."""
+        key = (hash(img.tobytes()), img.shape, side)
+        if getattr(self, "_last_key", None) == key:
+            return {k: dict(v) for k, v in self._last_out.items()}
+        out = self._predict(img, side)
+        self._last_key, self._last_out = key, {k: dict(v) for k, v in out.items()}
+        return out
+
+    def _predict(self, img: np.ndarray, side: str | None = None) -> dict:
         h, w = img.shape
         flip = self.kind == "hip" and side == "L"
         if flip:

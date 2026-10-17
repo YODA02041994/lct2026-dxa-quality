@@ -107,7 +107,7 @@ class LandmarkPredictor(Predictor):
                 om, boxes = self.objmap.features(img)
                 cnn.update(om)
             feats = spine_features(lm, h, w, img, cnn)
-            if getattr(self, "fxr", None) and self.fxr.ok:
+            if getattr(self, "fxr", None) and self.fxr.ok and self.fxr.has_cached(img):   # только если FleXray уже запускали
                 try:
                     feats.update(self.fxr.spine_features(img))
                 except Exception:  # noqa: BLE001
