@@ -3,7 +3,7 @@
 Решение задачи № 4 хакатона «Лидеры цифровой трансформации 2026» (постановщик — Центр диагностики и телемедицины
 Департамента здравоохранения Москвы).
 
-Прототип: https://docsemenov.ru/dxa/ · описание API: https://docsemenov.ru/dxa/docs ·
+Прототип: https://docsemenov.ru/dxa/ — два режима: «Укладка» (лаборант, пациент на столе: снимок → решение на снимке → пересъёмка; пример — https://docsemenov.ru/dxa/?demo=1#mode=lab) и «Оценка качества» (все снимки постфактум, таблица ТЗ; пример — https://docsemenov.ru/dxa/?demo=1#mode=qa) · описание API: https://docsemenov.ru/dxa/docs ·
 презентация: https://docsemenov.ru/dxa/files/DXA-QC_presentation.pdf · веса, готовый образ контейнера и запись работы: [Releases](https://github.com/YODA02041994/lct2026-dxa-quality/releases)
 
 ## 1. Назначение, возможности, ограничения
