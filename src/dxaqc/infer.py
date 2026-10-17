@@ -164,6 +164,9 @@ def process_file(path: str, root: str, predictor: Predictor, cache: dict) -> dic
                                      "region_votes": {"width": region_w, "localizers": region_loc, "flexray": region_fx},
                                      **({"pixel_mm": round(mm, 4), "pixel_mm_source": mm_src} if mm else {}),
                                      "level": verdict.level, "check_flags": verdict.check_flags, "scoliosis": scol,
+                                     "states": {c: ("violation" if p >= predictor.thresholds.get(c, 0.5) else
+                                                    "near" if (c in verdict.check_flags or c in verdict.review_flags) else "ok")
+                                                for c, p in verdict.flag_probs.items()},
                                      "needs_review": verdict.needs_review, "review_flags": verdict.review_flags,
                                      "comment": ex.get("comment", ""), "advice": ex.get("advice", []), "objects": ex.get("objects", []), "roi": ex.get("roi", {}),
                                      "landmarks": {k: [round(v["x"], 1), round(v["y"], 1), round(v.get("conf", 1), 2)] for k, v in ex.get("landmarks", {}).items() if v.get("present")},
