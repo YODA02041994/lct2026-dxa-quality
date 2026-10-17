@@ -280,7 +280,7 @@ class Localizer:
 
     def __init__(self, kind: str, weights: str, device: str | None = None, absent_thr: float = 0.3):
         self.kind, self.names = kind, LM[kind]
-        self.device = device or ("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
+        self.device = device or os.environ.get("DXAQC_DEVICE") or ("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
         ck = torch.load(weights, map_location="cpu")
         sds = ck.get("state_dicts") or [ck["state_dict"]]
         self.nets = []

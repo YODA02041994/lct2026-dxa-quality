@@ -185,7 +185,7 @@ class CnnScorer:
     """Загружает weights/cnn_<criterion>.pt и отдаёт вероятность нарушения для снимка (левое бедро отражается)."""
 
     def __init__(self, weights: str, device: str | None = None):
-        self.device = device or ("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
+        self.device = device or os.environ.get("DXAQC_DEVICE") or ("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
         ck = torch.load(weights, map_location="cpu")
         self.kind, self.criterion, self.size = ck["kind"], ck["criterion"], ck.get("size", SIZE)
         self.arch = ck.get("arch", "resnet18")
@@ -210,6 +210,9 @@ class CnnScorer:
             if not lm:
                 return 0.0
             img = crop_around(img, lm, CROP_LM[self.crop], self.half, mirrored)
+        if img.size == 0 or min(img.shape) < 2:                   # ориентиры вне кадра: снимок не похож на эту область (эксп. 29,
+            raise ValueError("unsupported_image: ориентиры области вне кадра — "   # боковой снимок позвоночника, принятый за бедро)
+                             "снимок не похож на поясничный отдел или проксимальный отдел бедра")
         h, w = img.shape
         M0 = letterbox_matrix(h, w, self.size)
         mats = [M0]
@@ -229,7 +232,7 @@ class ObjMapScorer:
 
     def __init__(self, weights: str, device: str | None = None):
         from .landmarks import HeatmapNet
-        self.device = device or ("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
+        self.device = device or os.environ.get("DXAQC_DEVICE") or ("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
         ck = torch.load(weights, map_location="cpu", weights_only=False)
         self.size = int(ck.get("size", 320))
         self.net = HeatmapNet(1, pretrained=False)
