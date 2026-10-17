@@ -366,23 +366,27 @@ ADVICE = {
 
 
 def explain(region: str, f: dict, probs: dict, thresholds: dict) -> tuple[str, list[str]]:
-    """Короткий протокол измерений и советы по нарушенным критериям."""
+    """Протокол по критериям и рекомендации. Статус критерия берётся из вероятности и порога модели — текст не может
+    противоречить вердикту (раньше фиксированная отсечка писала «гребни, возможно, вне кадра» на снимках в норме).
+    Число показывается только у нарушенного или пограничного критерия, десятичная запятая, без служебных терминов."""
+    def num(x, nd=1):
+        return f"{float(x):.{nd}f}".replace(".", ",")
+
+    names = {"spine_positioning": "укладка", "spine_axis_tilt": "ось", "spine_artifact": "посторонние предметы",
+             "hip_positioning_rotation": "укладка и ротация", "hip_roi_field": "поле сканирования"}
+    facts = {"spine_axis_tilt": f"наклон оси {num(f.get('axis_img_deg', 0))}°",
+             "spine_artifact": "яркие линейные тени вне позвоночника" if f.get("th_frac40", 0) > 0.003 else "",
+             "hip_positioning_rotation": f"наклон диафиза {num(f.get('shaft_img_deg', 0))}°",
+             "hip_roi_field": f"наименьший запас до края кадра {num(f.get('min_cm', 0))} см"}
     parts, advice = [], []
-    if region == REGION_SPINE:
-        parts.append(f"ось {f.get('axis_img_deg', 0):.1f}°")
-        parts.append("гребни в кадре" if f.get("bottom_width", 0) >= 0.45 else "полоса таза внизу узкая — гребни, возможно, вне кадра")
-        parts.append(f"Th12 (уверенность {f.get('th12_conf', 0):.2f})")
-        if f.get("th_frac40", 0) > 0.003:
-            parts.append(f"тонкие яркие линии вне столба ({f.get('th_frac40', 0) * 100:.1f} % площади)")
-        if f.get("scol_bend_deg", 0) >= 5:                      # пограничная асимметрия — как измерение, не как вердикт
-            parts.append(f"искривление по центрам тел {f['scol_bend_deg']:.1f}°" + (" (пограничная асимметрия, не нарушение укладки)" if f["scol_bend_deg"] < 10 else ""))
-    else:
-        parts.append(f"диафиз {f.get('shaft_img_deg', 0):.1f}° к вертикали")
-        parts.append(f"запас до края: снизу {f.get('bottom_cm', 0):.1f} см, сверху {f.get('top_cm', 0):.1f} см, сбоку {f.get('lat_cm', 0):.1f} см")
-        parts.append(f"высота кадра {f.get('frame_h_cm', 0):.1f} см")
-        if "cnn_hip_pos" in f:
-            parts.append(f"ротация по вертелу (сеть) {f['cnn_hip_pos']:.2f}")
     for c, p in probs.items():
-        if p >= thresholds.get(c, 0.5):
+        thr = thresholds.get(c, 0.5)
+        state = "нарушение" if p >= thr else "у порога" if abs(p - thr) < 0.10 else "норма"
+        fact = facts.get(c, "") if state != "норма" else ""
+        parts.append(f"{names.get(c, c)} — {state}" + (f" ({fact})" if fact else ""))
+        if p >= thr:
             advice.append(ADVICE.get(c, ""))
+    if region == REGION_SPINE and f.get("scol_bend_deg", 0) >= 5:   # пограничная асимметрия — как измерение, не как вердикт
+        b = f["scol_bend_deg"]
+        parts.append(f"искривление по центрам тел позвонков {num(b)}° — " + ("пограничная асимметрия" if b < 10 else "сколиотическая деформация"))
     return "; ".join(parts), [a for a in advice if a]
