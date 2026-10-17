@@ -1,0 +1,112 @@
+{
+ "исходный": {
+  "processed": 40,
+  "n": 40,
+  "region": 40,
+  "class": 40,
+  "level": 40,
+  "dp_median": 0.0,
+  "dp_max": 0.0,
+  "dcm_median": 0.0
+ },
+ "масштаб 0,75 + тег": {
+  "processed": 40,
+  "n": 40,
+  "region": 40,
+  "class": 34,
+  "level": 31,
+  "dp_median": 0.009,
+  "dp_max": 0.549,
+  "dcm_median": 0.01
+ },
+ "масштаб 1,5 + тег": {
+  "processed": 40,
+  "n": 40,
+  "region": 40,
+  "class": 35,
+  "level": 33,
+  "dp_median": 0.012,
+  "dp_max": 0.55,
+  "dcm_median": 0.02
+ },
+ "масштаб 1,5 без тега": {
+  "processed": 40,
+  "n": 40,
+  "region": 40,
+  "class": 35,
+  "level": 30,
+  "dp_median": 0.029,
+  "dp_max": 0.55,
+  "dcm_median": 0.42
+ },
+ "гамма 0,7": {
+  "processed": 40,
+  "n": 40,
+  "region": 40,
+  "class": 32,
+  "level": 27,
+  "dp_median": 0.007,
+  "dp_max": 0.686,
+  "dcm_median": 0.0
+ },
+ "гамма 1,4": {
+  "processed": 40,
+  "n": 40,
+  "region": 40,
+  "class": 39,
+  "level": 38,
+  "dp_median": 0.018,
+  "dp_max": 0.436,
+  "dcm_median": 0.0
+ },
+ "контраст 0,8": {
+  "processed": 40,
+  "n": 40,
+  "region": 40,
+  "class": 30,
+  "level": 27,
+  "dp_median": 0.046,
+  "dp_max": 0.977,
+  "dcm_median": 0.0
+ },
+ "шум σ 5": {
+  "processed": 40,
+  "n": 40,
+  "region": 40,
+  "class": 37,
+  "level": 31,
+  "dp_median": 0.047,
+  "dp_max": 0.969,
+  "dcm_median": 0.0
+ },
+ "размытие σ 1": {
+  "processed": 40,
+  "n": 40,
+  "region": 40,
+  "class": 39,
+  "level": 37,
+  "dp_median": 0.017,
+  "dp_max": 0.529,
+  "dcm_median": 0.0
+ },
+ "12 бит": {
+  "processed": 40,
+  "n": 40,
+  "region": 40,
+  "class": 40,
+  "level": 39,
+  "dp_median": 0.0,
+  "dp_max": 0.05,
+  "dcm_median": 0.0
+ },
+ "MONOCHROME1": {
+  "processed": 40,
+  "n": 40,
+  "region": 40,
+  "class": 40,
+  "level": 40,
+  "dp_median": 0.0,
+  "dp_max": 0.0,
+  "dcm_median": 0.0
+ }
+}

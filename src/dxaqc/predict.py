@@ -137,6 +137,32 @@ class LandmarkPredictor(Predictor):
     def explain(self) -> dict:
         return dict(self._last)
 
+    # Анатомическая «линейка» — медианы по разметке врачей на обучающем наборе (масштаб 0,60/0,65 мм известен, docs/05, эксп. 27):
+    # расстояние между центрами соседних тел L1–L5 — 31,1 мм (CV 8 %); бедро: центр головки → верхушка большого вертела 56,8 мм,
+    # → малый вертел 64,0 мм, → седалищный бугор 60,0 мм (CV 12 % каждое).
+    RULER_SPINE_MM = 31.1
+    RULER_HIP_MM = {("head", "gt_top"): 56.8, ("head", "lt_tip"): 64.0, ("head", "ischium"): 60.0}
+
+    def anatomical_mm(self, img: np.ndarray, region: str) -> float | None:
+        """Масштаб кадра по анатомии — только для кадров нестандартной ширины без тегов масштаба (другой аппарат).
+        Точность ±10 %: размеры тела у людей разные. None — уверенных ориентиров мало."""
+        from .region import hip_side
+        if region == REGION_SPINE:
+            lm = self.loc["spine"].predict(img)
+            pts = [(lm[k]["x"], lm[k]["y"]) for k in ("L1", "L2", "L3", "L4", "L5") if k in lm and lm[k].get("conf", 0) >= 0.5]
+            if len(pts) < 3:
+                return None
+            d = [math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]) for i in range(len(pts) - 1)]
+            return self.RULER_SPINE_MM / float(np.median(d)) if np.median(d) > 1 else None
+        lm = self.loc["hip"].predict(img, hip_side(img).side)
+        est = []
+        for (a, b), ref in self.RULER_HIP_MM.items():
+            if a in lm and b in lm and min(lm[a].get("conf", 0), lm[b].get("conf", 0)) >= 0.5:
+                d = math.hypot(lm[a]["x"] - lm[b]["x"], lm[a]["y"] - lm[b]["y"])
+                if d > 1:
+                    est.append(ref / d)
+        return float(np.median(est)) if est else None
+
     def guess_region(self, img: np.ndarray, floor: float = 0.30) -> str | None:
         """Область для кадра нестандартной ширины: у какого локализатора выше средняя уверенность ориентиров.
         На 252 снимках обучающего набора с изменённым масштабом правило верно в 252 случаях, наименьший отрыв 0,36;

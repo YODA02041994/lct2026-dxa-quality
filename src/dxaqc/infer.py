@@ -21,7 +21,7 @@ import numpy as np
 import pydicom
 from openpyxl import Workbook
 
-from .labels import PROB_COLUMN, REGION_HIP
+from .labels import PROB_COLUMN, REGION_HIP, dicom_pixel_mm, scale_override
 from .loader import _pixel_hash
 from .predict import NullPredictor, Predictor, aggregate, load_default_predictor
 from .region import decide_region, hip_side, region_by_width
@@ -133,14 +133,20 @@ def process_file(path: str, root: str, predictor: Predictor, cache: dict) -> dic
         if region is None:
             raise ValueError(f"unsupported_image: кадр {img.shape[0]}×{img.shape[1]} — скелет поясничного отдела "
                              f"или проксимального отдела бедра не распознан")
+        # масштаб (эксп. 27): теги DICOM → по анатомии для нестандартного кадра → по ширине выгрузки GE Lunar (как раньше)
+        mm, mm_src = dicom_pixel_mm(ds)
+        if mm is None and region_w is None and hasattr(predictor, "anatomical_mm"):
+            mm = predictor.anatomical_mm(img, region)
+            mm_src = "анатомия" if mm else ""
         h = _pixel_hash(ds)
         if h in cache:
             verdict, side, first = cache[h]
             row["duplicate_of"] = first
         else:
             side = hip_side(img).side if region == REGION_HIP else ""
-            verdict = aggregate(predictor.predict_flags(img, region, side or None), predictor.thresholds,
-                                getattr(predictor, "soft_thresholds", None))
+            with scale_override(mm):
+                flags = predictor.predict_flags(img, region, side or None)
+            verdict = aggregate(flags, predictor.thresholds, getattr(predictor, "soft_thresholds", None))
             if not region_agree:                                     # область по анатомии разошлась с шириной кадра — показать глазами
                 verdict.needs_review = True
                 verdict.review_flags = list(verdict.review_flags) + ["region"]
@@ -156,6 +162,7 @@ def process_file(path: str, root: str, predictor: Predictor, cache: dict) -> dic
             scol["text"] = decision_text(scol.get("grade", "none"), verdict.quality_class == 1) if marked else ""
         row["details"] = json.dumps({"probs": {k: round(v, 4) for k, v in verdict.flag_probs.items()}, "region_by": region_by,
                                      "region_votes": {"width": region_w, "localizers": region_loc, "flexray": region_fx},
+                                     **({"pixel_mm": round(mm, 4), "pixel_mm_source": mm_src} if mm else {}),
                                      "level": verdict.level, "check_flags": verdict.check_flags, "scoliosis": scol,
                                      "needs_review": verdict.needs_review, "review_flags": verdict.review_flags,
                                      "comment": ex.get("comment", ""), "advice": ex.get("advice", []), "objects": ex.get("objects", []), "roi": ex.get("roi", {}),

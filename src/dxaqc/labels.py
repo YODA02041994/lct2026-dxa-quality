@@ -49,9 +49,45 @@ PIXEL_MM_Y_SCANNER = 1.05
 PIXEL_MM_EXPORT = {300: 0.60, 280: 0.65, 248: 0.61}   # по ширине изображения → мм/px (обе оси), ±10 %
 
 
+_SCALE: list[float] = []                              # стек явного масштаба на время обработки одного снимка (infer.process_file)
+
+
+class scale_override:
+    """Масштаб снимка из DICOM (PixelSpacing) или по анатомии — на время обработки одного снимка.
+    Пока он задан, pixel_mm() возвращает его, а не значение по ширине кадра. None — ничего не меняет."""
+
+    def __init__(self, mm: float | None):
+        self.mm = mm
+
+    def __enter__(self):
+        _SCALE.append(self.mm if self.mm and self.mm > 0 else 0.0)
+        return self
+
+    def __exit__(self, *exc):
+        _SCALE.pop()
+        return False
+
+
 def pixel_mm(cols: int) -> float:
-    """мм на пиксель для выгруженного изображения по его ширине; неизвестная ширина → 0,6."""
+    """мм на пиксель: явный масштаб снимка (scale_override), иначе по ширине выгрузки GE Lunar; неизвестная ширина → 0,6."""
+    if _SCALE and _SCALE[-1] > 0:
+        return float(_SCALE[-1])
     return PIXEL_MM_EXPORT.get(int(cols), 0.6)
+
+
+def dicom_pixel_mm(ds) -> tuple[float | None, str]:
+    """Масштаб из тегов DICOM: PixelSpacing, иначе ImagerPixelSpacing. Пиксель у других производителей бывает
+    неквадратным — берём среднее двух значений (пересэмплирования нет), оба значения пишутся в details."""
+    for tag in ("PixelSpacing", "ImagerPixelSpacing"):
+        v = getattr(ds, tag, None)
+        try:
+            vals = [float(x) for x in (v or [])]
+        except (TypeError, ValueError):
+            continue
+        vals = [x for x in vals if 0.05 <= x <= 5.0]
+        if vals:
+            return float(sum(vals) / len(vals)), f"{tag} {'×'.join(f'{x:g}' for x in vals)}"
+    return None, ""
 
 
 def violation_string(flags: dict[str, int | float | bool]) -> str:
