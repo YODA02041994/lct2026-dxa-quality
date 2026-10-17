@@ -124,7 +124,7 @@ docker/, Dockerfile, Dockerfile.cuda, docker-compose.yml, requirements*.txt, req
 Те же шаги вручную:
 
 ```bash
-scripts/download_weights.sh            # 18 файлов, 0,9 ГБ; тег по умолчанию v1.0.0, другой: TAG=… scripts/download_weights.sh
+scripts/download_weights.sh            # 18 файлов модели (0,9 ГБ) + FleXray (0,4 ГБ); тег по умолчанию v1.1.0, другой: TAG=… scripts/download_weights.sh
 docker build -t dxaqc .                # или: docker compose build
 docker save dxaqc | gzip > dxaqc.tar.gz   # перенос образа на машину без интернета: docker load < dxaqc.tar.gz
 ```
