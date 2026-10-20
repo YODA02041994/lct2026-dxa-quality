@@ -42,3 +42,6 @@ presentation/img/cases_src/
 presentation/img/cases2*.jpg
 presentation/img/ui_levels*.jpg
 presentation/img/ui_*.jpg
+
+# Фото участников для слайда состава команды — в git не кладём (личные данные)
+presentation/img/*_photo.jpg
