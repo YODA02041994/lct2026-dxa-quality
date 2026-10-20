@@ -59,6 +59,7 @@ location ^~ /dxa/ {
 | `DXAQC_WEIGHTS` | `<проект>/weights` | папка весов |
 | `DXAQC_MODE` | `competition` | пороги: `competition` или `sensitive` |
 | `DXAQC_NETS_PER_FILE` | все | `1` — экономный режим для 2 ядер и 4 ГБ на процесс |
+| `DXAQC_FULL_CRITERIA` | `spine_artifact` | критерии, которые экономный режим не урезает (через запятую); `none` — урезать все |
 | `DXAQC_RUNS` | временная папка | где хранить загруженные файлы и результаты |
 | `DXAQC_RUN_TTL_MIN` | 180 | срок хранения прогона, минут |
 | `DXAQC_MAX_UPLOAD_MB` | 500 | предел размера загрузки |
