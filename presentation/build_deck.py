@@ -418,9 +418,9 @@ s, y = d.slide("Материалы решения", "Ссылки")
 d.table(s, [["Материал", "Адрес"],
             ["Исходный код, README", "github.com/YODA02041994/lct2026-dxa-quality"],
             ["Прототип и описание API", "docsemenov.ru/dxa · docsemenov.ru/dxa/docs"],
-            ["Веса моделей (18 файлов)", "github.com/YODA02041994/lct2026-dxa-quality/releases"],
+            ["Веса и готовый образ", "github.com/YODA02041994/lct2026-dxa-quality/releases"],
             ["Документация", "docs/: руководство пользователя, развёртывание, обучение"],
-            ["Демонстрация", "docs/DEMO.md · запись: docsemenov.ru/dxa/files/dxaqc_demo.gif"],
+            ["Демонстрация", "docs/DEMO.md · пример на стенде: docsemenov.ru/dxa/?demo=1"],
             ["Журнал экспериментов", "docs/05_Эксперименты.md, docs/08_Рисерч_что_ещё.md"],
             ["Сторонние модели и данные", "object-CXR (CC BY-NC 4.0) · TorchXRayVision (MIT) · FleXray (CC BY-NC 4.0)"]],
         y + Inches(0.05), [4.2, 7.55], size=15, row_h_in=0.46)
