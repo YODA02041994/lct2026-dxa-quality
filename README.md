@@ -52,7 +52,7 @@ git clone https://github.com/YODA02041994/lct2026-dxa-quality && cd lct2026-dxa-
 docker run --rm -v "$PWD/in:/in" -v "$PWD/out:/out" dxaqc run -i /in -o /out --overlays --sr`.
 
 Без сборки: готовый образ linux/amd64 версии 1.1.0 лежит в Release `v1.1.0-image` (архив 1,8 ГБ, рядом файл с контрольной суммой).
-Образ собран из чистого клона `main` с весами, скачанными без авторизации, и проверен без сети:
+Образ собран 20.10 из чистого клона `main` с весами Release `v1.1.0` и проверен без сети:
 
 ```bash
 curl -LO https://github.com/YODA02041994/lct2026-dxa-quality/releases/download/v1.1.0-image/dxaqc_amd64.tar.gz
