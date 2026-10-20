@@ -146,7 +146,8 @@ docker save dxaqc | gzip > dxaqc.tar.gz   # перенос образа на м�
 | `dxaqc serve [--port 8000]` | HTTP-сервис и веб-страница |
 
 Переменные окружения: `DXAQC_WEIGHTS` (папка весов), `DXAQC_MODE` (`competition`/`sensitive`), `DXAQC_NETS_PER_FILE=1`
-(экономный режим для слабого сервера: одна сеть из файла вместо ансамбля из трёх), `DXAQC_MAX_UPLOAD_MB`, `DXAQC_RUN_TTL_MIN`, `DXAQC_FILES` (необязательная папка материалов, отдаётся по `/files/<имя>`).
+(экономный режим для слабого сервера: одна сеть из файла вместо ансамбля из трёх; сети по посторонним предметам
+остаются полными — список задаёт `DXAQC_FULL_CRITERIA`, по умолчанию `spine_artifact`), `DXAQC_MAX_UPLOAD_MB`, `DXAQC_RUN_TTL_MIN`, `DXAQC_FILES` (необязательная папка материалов, отдаётся по `/files/<имя>`).
 
 Запуск без контейнера: `pip install -r requirements.txt && PYTHONPATH=src python -m dxaqc run -i <вход> -o <выход>`.
 Подробно — [docs/DEPLOY.md](docs/DEPLOY.md).

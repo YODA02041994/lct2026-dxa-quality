@@ -201,13 +201,17 @@ def shaft_axis_from_image(img: np.ndarray | None, x_seed: float, rows_frac: floa
     return abs(math.degrees(math.atan2(v[0], v[1])))
 
 
-def artifact_features(img: np.ndarray | None) -> dict:
+def artifact_features(img: np.ndarray | None, centers: list[tuple[float, float]] | None = None) -> dict:
     """Посторонние предметы на снимке позвоночника (эксп. 05, монтаж 17 положительных): это тонкие яркие линии и
     дуги у краёв кадра (фурнитура одежды, цепочки) и «серая вуаль» плотной ткани. Ориентиры их не видят, CNN — слабо
     (0,73–0,76). Здесь: верхний top-hat (ядро 9 px) выделяет тонкие яркие структуры; считаем их вне столба
     позвоночника (±20 % ширины от центра столба) и вне чёрных масок. th_frac40 — доля пикселей с откликом > 40
     (AUC 0,91), th_p999 — 99,9-й перцентиль отклика (0,90), th_lines — число вытянутых компонент (0,78),
-    bg_median — яркость фона в средней полосе (вуаль, 0,65)."""
+    bg_median — яркость фона в средней полосе (вуаль, 0,65).
+
+    centers — центры тел Th12, L1–L5 (x, y): полоса позвоночника идёт по ним, а не по прямой вертикали. Только для эксп. 30:
+    гипотеза «прямая полоса отрезает изогнутый столб при сколиозе» не подтвердилась (признак на сколиозах почти не меняется,
+    ложные «предметы» те же), вариант отклонён воротами. В бою centers не передаётся — поведение прежнее."""
     f = {"th_frac40": 0.0, "th_frac40_log": 0.0, "th_p999": 0.0, "th_lines": 0.0, "th_linearea": 0.0, "bg_median": 0.0}
     if img is None:
         return f
@@ -220,7 +224,14 @@ def artifact_features(img: np.ndarray | None) -> dict:
     cols = np.convolve((mid >= thr).mean(0), np.ones(15) / 15, "same")
     cx = int(np.argmax(cols))
     outside = np.ones((h, w), bool)
-    outside[:, max(0, cx - int(w * 0.2)):min(w, cx + int(w * 0.2))] = False
+    half = int(w * 0.2)
+    pts = sorted((c for c in (centers or []) if c), key=lambda c: c[1])
+    if len(pts) >= 3:                                   # полоса по центрам тел позвонков (эксп. 30)
+        rows_c = np.interp(np.arange(h), [c[1] for c in pts], [c[0] for c in pts]).round().astype(int)
+        for yy, xc in enumerate(rows_c):
+            outside[yy, max(0, xc - half):min(w, xc + half)] = False
+    else:                                               # прямая полоса вокруг самого яркого столбца (эксп. 05)
+        outside[:, max(0, cx - half):min(w, cx + half)] = False
     outside &= img > 0
     th = cv2.morphologyEx(img, cv2.MORPH_TOPHAT, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)))
     r = th[outside].astype(np.float32)

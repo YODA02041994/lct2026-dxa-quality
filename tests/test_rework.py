@@ -67,3 +67,27 @@ def test_advice_is_general():
     for text in ADVICE.values():
         assert not re.search(r"\d", text), text          # без градусов и сантиметров
         assert "повернуть" not in text.lower() and "довернуть" not in text.lower()
+
+
+def test_decision_text_names_findings():
+    t = decision_text(GRADE_MARKED, ["spine_artifact"], [])
+    assert "посторонние предметы" in t and "укладк" not in t.split("найдено:")[1], t
+    t = decision_text(GRADE_MARKED, [], ["spine_artifact"])
+    assert "у порога: посторонние предметы" in t and "соблюдены" not in t, t
+    t = decision_text(GRADE_MARKED, [], [])
+    assert "соблюдены" in t and not re.search(r"\d", t), t
+
+
+def test_economy_mode_keeps_full_artifact_ensemble(monkeypatch):
+    import glob, os
+    from dxaqc.cnn import CnnScorer
+    files = sorted(glob.glob(os.path.join(os.path.dirname(__file__), "..", "weights", "cnn_spine_artifact_*.pt")))
+    hips = sorted(glob.glob(os.path.join(os.path.dirname(__file__), "..", "weights", "cnn_hip_positioning_rotation_lt100.pt")))
+    if not files or not hips:
+        import pytest; pytest.skip("нет весов")
+    monkeypatch.setenv("DXAQC_NETS_PER_FILE", "1"); monkeypatch.setenv("DXAQC_DEVICE", "cpu")
+    monkeypatch.delenv("DXAQC_FULL_CRITERIA", raising=False)
+    art, hip = CnnScorer(files[0]), CnnScorer(hips[0])
+    monkeypatch.delenv("DXAQC_NETS_PER_FILE")
+    assert len(art.nets) == len(CnnScorer(files[0]).nets)      # предметы — все сети файла
+    assert len(hip.nets) == 1                                  # бедро — экономно, одна сеть

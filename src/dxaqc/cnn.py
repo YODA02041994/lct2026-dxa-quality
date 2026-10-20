@@ -194,7 +194,11 @@ class CnnScorer:
         self.nets = []
         sds = ck.get("state_dicts") or [ck["state_dict"]]
         limit = int(os.environ.get("DXAQC_NETS_PER_FILE", "0"))    # экономный режим (слабый сервер): взять только первые N сетей из файла
-        if limit > 0:
+        full = {c.strip() for c in os.environ.get("DXAQC_FULL_CRITERIA", "spine_artifact").split(",") if c.strip()}
+        # Критерии из DXAQC_FULL_CRITERIA экономный режим не урезает. По умолчанию — посторонние предметы: три небольшие сети
+        # по три копии (+0,3 ГБ), а одна копия вместо трёх сдвигала пограничные снимки (№ 011: 0,35 → 0,44, «проверить»
+        # вместо «в норме», 20.10). Экономия остаётся на крупных ансамблях бедра.
+        if limit > 0 and self.criterion not in full:
             sds = sds[:limit]
         for sd in sds:
             n = make_net(pretrained=False, arch=self.arch)
